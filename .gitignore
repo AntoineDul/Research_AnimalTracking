@@ -1,0 +1,13 @@
+
+data/
+models/
+outputs/
+venv/
+
+# Python cache files
+src/__pycache__/
+src/modules/__pycache__/
+src/modules/detectors/__pycache__/
+src/modules/trackers/__pycache__/
+tests/__pycache__/
+
