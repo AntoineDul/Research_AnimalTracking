@@ -10,4 +10,4 @@ src/modules/__pycache__/
 src/modules/detectors/__pycache__/
 src/modules/trackers/__pycache__/
 tests/__pycache__/
-
+.pytest_cache/

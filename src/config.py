@@ -1,10 +1,13 @@
 import os
+from pathlib import Path
 
 # Paths
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 MODEL_DIR = os.path.join(BASE_DIR, "models")
 YOLO_MODEL_PATH = os.path.join(MODEL_DIR, "yolov11_pig_v2.pt")
+MEDIAFLUX_VIDEO_DIR = "C:\\Users\\antoi\\Documents\\Unimelb_Mediaflux\\2024-08-08-08\\Pen2_D5-8"
+RFID_PATH = os.path.join(DATA_DIR, "RFID", "21-056 Drinker Raw Data 26Jun2024-18Sep2024.xlsx")
 
 
 # Select detection model
@@ -28,3 +31,8 @@ ALPHA = 0.5                                     # Weight for IoU in cost functio
 
 # Video processing settings
 FRAME_SKIP = 2                                  # Number of frames to skip for processing
+
+# Output settings
+OUTPUT_VIDEO_WIDTH = 1600                        # Width of output video
+OUTPUT_VIDEO_HEIGHT = 900                       # Height of output video
+OUTPUT_VIDEO_FPS = 20                           # Frames per second for output video

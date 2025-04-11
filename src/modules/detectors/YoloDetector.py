@@ -22,7 +22,13 @@ class YoloDetector(BaseDetector):
     def detect(self, frame, print_detected=False):
         # TODO: Add image enhancement before processing them
         
-        original_h, original_w = frame.shape[:2]  # Get original size
+        try :
+            original_h, original_w = frame.shape[:2]  # Get original size
+        except AttributeError:
+            # If testing with image (jpg, jpeg, png), read the image
+            frame = cv2.imread(frame)
+            original_h, original_w = frame.shape[:2]
+
         resized_frame = cv2.resize(frame, (self.yolo_imgsz, self.yolo_imgsz))  # Resize to expected yolo input size
 
         pigs_detected = []
