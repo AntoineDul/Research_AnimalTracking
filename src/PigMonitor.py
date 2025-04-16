@@ -7,11 +7,16 @@ class PigMonitor:
     
     def __init__(self):
         self.detector = modules.Detector()
-        self.trackers = [modules.Tracker(), modules.Tracker(), modules.Tracker(), modules.Tracker()]    # TODO : implement multi tracker to make this cleaner
+        self.mapper = modules.Mapper(config.MAPPINGS)
+        self.multi_tracker = modules.MultiTracker(config.NUM_CAMERAS, config.FIRST_CAMERA, self.mapper, config.CLUSTER_EPSILON, config.CLUSTER_MIN_SAMPLES, config.MAX_GLOBAL_AGE, config.MAX_CLUSTER_DISTANCE, False)
         self.drawer = modules.Drawer()
-        self.sync = modules.Synchronizer()
         self.file_directory = config.MEDIAFLUX_VIDEO_DIR
+        self.sync = modules.Synchronizer(self.file_directory)
+        self.video_writer_path = config.PROCESSED_VIDEO_PATH
+        self.tracking_history_path = config.TRACKING_HISTORY_PATH
         self.first_camera = 5
+        self.frame_number = 0
+        self.max_frames = 1000
 
     def process_frame(self, frame, frame_count, cam_id=None):
 
@@ -19,10 +24,7 @@ class PigMonitor:
         detections = self.detector.detect(frame)
 
         # Update tracks 
-        if cam_id is None:
-            tracks = self.trackers[0].track(detections)  # Default to one camera tracker
-        else:
-            tracks = self.trackers[cam_id % self.first_camera].track(detections)    # Use right tracker for camera
+        tracks = self.multi_tracker.track(detections, cam_id)
 
         # Draw tracks on the frame
         display_frame = self.drawer.draw_bboxes(frame.copy(), tracks)
@@ -31,6 +33,7 @@ class PigMonitor:
         return display_frame, tracks
 
     def monitor(self, video_path):
+        """Processes a single video file."""
 
         # Check if video path exists
         if os.path.exists(video_path):
@@ -46,7 +49,6 @@ class PigMonitor:
         
         # Define output video writer
         fourcc = cv2.VideoWriter_fourcc(*'XVID')
-        output_path = "outputs/tracked_pigs.avi"
         
         # Get video properties
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -55,7 +57,7 @@ class PigMonitor:
         if fps <= 0:
             fps = 30  # Default to 30 fps if not available
         
-        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        out = cv2.VideoWriter(self.video_writer_path, fourcc, fps, (width, height))
         
         print("Press 'q' to quit.")
         print("Press 's' to save a screenshot.")
@@ -112,10 +114,10 @@ class PigMonitor:
         out.release()
         cv2.destroyAllWindows()
         
-        print(f"Tracking complete. Output saved to {output_path}")
+        print(f"Tracking complete. Output saved to {self.video_writer_path}")
 
     def multi_monitor(self):
-
+        """Processes all video files in the directory specified in config."""
         # Check if directory exists
         if not os.path.exists(self.file_directory):
             print(f"Error: Directory {self.file_directory} not found.")
@@ -132,37 +134,22 @@ class PigMonitor:
         video_caps = {}
         fps_dict = {}
 
+        # Synchronize videos
         sorted_videos = self.sync.separate_by_cameras(video_files)
         camera_offsets = self.sync.get_offsets()
-
-        print(sorted_videos)
-
-        for cam_id, time_files in sorted_videos.items():        
-            file = time_files[0][1]             # Get the first video file for each camera
-            full_path = os.path.join(self.file_directory, file)
-            cap = cv2.VideoCapture(full_path)
-            fps = cap.get(cv2.CAP_PROP_FPS)     # 20 fps for all farm videos
-            fps = 20
-            offset_sec = camera_offsets[cam_id]
-            offset_frames = int(offset_sec * fps)
-            print("FPS", fps)
-            print("FRAME OFFSET", offset_frames)
-            cap.set(cv2.CAP_PROP_POS_FRAMES, offset_frames)
-            video_caps[cam_id] = cap
-            fps_dict[cam_id] = fps
+        video_caps, fps_dict = self.sync.synchronize(sorted_videos, camera_offsets)
         
         print("VIDEO CAPTURE OBJECTS INITIALIZED")
         print(video_caps)
 
         # Define output video writer
         fourcc = cv2.VideoWriter_fourcc(*'XVID')
-        output_path = "outputs/multi_tracked_pigs.avi"
 
         # Get video properties
         width = config.OUTPUT_VIDEO_WIDTH
         height = config.OUTPUT_VIDEO_HEIGHT
         fps = config.OUTPUT_VIDEO_FPS
-        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        out = cv2.VideoWriter(self.video_writer_path, fourcc, fps, (width, height))
 
         frame_count = 0
 
@@ -191,13 +178,17 @@ class PigMonitor:
 
             if not all_successful:
                 break
-    
+
+            self.multi_tracker.globally_match_tracks()  # Match tracks across cameras
+
             grid = self.drawer.make_grid(frames)
             out.write(grid)
             cv2.imshow('Synchronized 2x2 Grid', grid)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
+        
+        self.multi_tracker.save_tracking_history(self.tracking_history_path)
 
         # Cleanup
         for cap in video_caps.values():

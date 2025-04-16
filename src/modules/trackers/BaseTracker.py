@@ -9,3 +9,11 @@ class BaseTracker:
         """
 
         raise NotImplementedError("Subclasses must implement this method.")
+
+    def get_tracks(self):
+        """
+        Abstract method to get the current tracks.
+        :return: List of currently tracked objects.
+        """
+        
+        raise NotImplementedError("Subclasses must implement this method.")

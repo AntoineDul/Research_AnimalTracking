@@ -28,3 +28,14 @@ class Tracker:
         """
 
         return self.tracker.track(frame)
+
+    def get_tracks(self):
+        
+        """
+        Get the current tracks.
+
+        Returns:
+            list: List of currently tracked objects. Each object is represented as a dictionary with keys 'id', 'bbox_xyxy', 'center', 'cls', 'conf' and 'age'.
+        """
+
+        return self.tracker.get_tracks()

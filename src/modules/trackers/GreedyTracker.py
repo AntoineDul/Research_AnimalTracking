@@ -135,3 +135,6 @@ class GreedyTracker(BaseTracker):
         
 
         return self.tracked
+    
+    def get_tracks(self):
+        return self.tracked
