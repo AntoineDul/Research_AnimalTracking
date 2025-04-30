@@ -23,23 +23,9 @@ class MultiTracker:
         self.global_id_mapping = {}
         self.print_tracked = print_tracked
 
+        # for logs 
         self.tracking_history = []
         self.frame = 0
-    def convert_to_builtin_type(self, obj):
-        if isinstance(obj, np.integer):
-            return int(obj)
-        elif isinstance(obj, np.floating):
-            return float(obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif isinstance(obj, tuple):
-            return tuple(self.convert_to_builtin_type(x) for x in obj)
-        elif isinstance(obj, list):
-            return [self.convert_to_builtin_type(x) for x in obj]
-        elif isinstance(obj, dict):
-            return {k: self.convert_to_builtin_type(v) for k, v in obj.items()}
-        else:
-            return obj
     
     def save_tracking_history(self, file_path):
         """Save the tracking history to a JSON file."""
@@ -77,7 +63,9 @@ class MultiTracker:
         """Once all detections from all cameras have been tracked, match them to global tracks using clustering."""
 
         if len(self.globally_tracked) != 0:
-            self.tracking_history.append({'global tracks': self.globally_tracked.copy(), 'frame' : self.frame})   # 
+            history = {'global tracks': self.globally_tracked.copy(), 'frame' : self.frame}
+            print(f"\nFRAME {self.frame}: {history}\n")
+            self.tracking_history.append(history)   # 
             self.frame += 1     # NOTE: This is the number of frames processed, need to do times 2 to get real number since we skip every 2nd frame
 
         all_coords = np.array([d['world_coordinates'] for d in self.global_detections])
@@ -129,9 +117,6 @@ class MultiTracker:
         
         track_cluster_pairs = self.compute_track_cluster_pairs(cluster_center_label_pairs)
 
-        print("**************************")
-        print(f"track cluster pairs : {track_cluster_pairs}")
-
         # Track assignments
         assigned_tracks = set()
         assigned_clusters = set()
@@ -141,7 +126,6 @@ class MultiTracker:
             cluster_label = cluster_center_label_pairs[cluster_label_idx][1]
             cluster_center = cluster_center_label_pairs[cluster_label_idx][0]
             track_label = self.globally_tracked[track_idx]["id"]
-            print(f"cluster label : {cluster_label}\ntrack label : {track_label}")
             if track_label not in assigned_tracks and cluster_label not in assigned_clusters:
                 assigned_tracks.add(track_label)
                 assigned_clusters.add(cluster_label)
@@ -181,14 +165,9 @@ class MultiTracker:
         # intialize cost matrix 
         cost_matrix = np.zeros((len(self.globally_tracked), len(clusters_label_pairs)))
 
-        print(f"compute track cluster pairs\n======================================\nglobally tracked: {self.globally_tracked} \n clusters label pair : {clusters_label_pairs} \n ")
-
         # Iterate over all tracks and detections to fill the cost matrix
         for i, track in enumerate(self.globally_tracked):
             for j, (center, label) in enumerate(clusters_label_pairs):
-                print("TRACK: ", track)
-                print(f"Track center {i}: {track['center']}, Cluster center {j}: {center}, frame: {self.frame}")
-                print("==========================================")
 
                 cluster_distance = distance.euclidean(track['center'], center)
 
@@ -225,3 +204,19 @@ class MultiTracker:
             cluster_center_label_pairs.append(((center[0], center[1]), label))      # [((x, y), cluster_id), ...]
 
         return cluster_center_label_pairs
+
+    def convert_to_builtin_type(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, tuple):
+            return tuple(self.convert_to_builtin_type(x) for x in obj)
+        elif isinstance(obj, list):
+            return [self.convert_to_builtin_type(x) for x in obj]
+        elif isinstance(obj, dict):
+            return {k: self.convert_to_builtin_type(v) for k, v in obj.items()}
+        else:
+            return obj

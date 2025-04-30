@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 import numpy as np
 
 # Directories
@@ -7,17 +6,20 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 MODEL_DIR = os.path.join(BASE_DIR, "models")
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
-MEDIAFLUX_VIDEO_DIR = "C:\\Users\\antoi\\Documents\\Unimelb_Mediaflux\\2024-08-08-08\\Pen2_D5-8"
+MEDIAFLUX_VIDEO_DIR = "C:\\Users\\antoi\\Documents\\Unimelb_Mediaflux\\2024-10-16~08"
 
 # Paths
-TRACKING_HISTORY_PATH = os.path.join(OUTPUT_DIR, "track_history/tracking_history.json")
-PROCESSED_VIDEO_PATH = os.path.join(OUTPUT_DIR, "processed_videos/tracked_pigs.avi")
+TRACKING_HISTORY_PATH = os.path.join(OUTPUT_DIR, "track_history\\tracking_history.json")
+OUTPUT_PLOT_PATH = os.path.join(OUTPUT_DIR, "track_history\\global_movements.png")
+PROCESSED_VIDEO_PATH = os.path.join(OUTPUT_DIR, "processed_videos\\tracked_pigs.avi")
 YOLO_MODEL_PATH = os.path.join(MODEL_DIR, "yolov11_pig_v2.pt")
 RFID_PATH = os.path.join(DATA_DIR, "RFID", "21-056 Drinker Raw Data 26Jun2024-18Sep2024.xlsx")
 
 # Farm settings
-NUM_CAMERAS = 4                                 # Number of cameras in the pen monitored
+NUM_CAMERAS = 5                                 # Number of cameras in the pen monitored
 FIRST_CAMERA = 5                                # First camera ID in the pen monitored (pen 2)
+RESOLUTION = (2592, 1944)                       # Camera resolution from official datasheet
+DISTORTION = [-0.5, 0.1, 0, 0]                  # Distortion parameters used to undistort fisheye (found thorugh trial and error)
 
 # Select detection model and tracking method
 DETECTION_METHOD = "YOLO"                       # Options: "YOLO", "ColorSegmentation"
@@ -35,8 +37,6 @@ MAX_TRACK_AGE = 10                              # Max frames a lost object remai
 IOU_THRESHOLD = 0.6                             # Intersection over Union threshold for tracking
 MAX_DISTANCE = 50                               # Maximum distance for matching detections to existing tracks   
 ALPHA = 0.5                                     # Weight for IoU in cost function, weight of distance is (1 - alpha)
-MAX_GLOBAL_AGE = 10                              # Maximum age of a global track before it is removed
-MAX_CLUSTER_DISTANCE = 1                        # Maximum distance between two detections to be considered the same object
 
 # Video processing settings
 FRAME_SKIP = 2                                  # Number of frames to skip for processing
@@ -47,6 +47,68 @@ OUTPUT_VIDEO_HEIGHT = 900                       # Height of output video
 OUTPUT_VIDEO_FPS = 20                           # Frames per second for output video
 
 # Mapping settings
+MAPPINGS = {
+    '5' : {
+    'image_points': np.array(
+        [[1580, 243], [1299, 203], [921, 145], [575, 93], [1096, 1699], [847, 1628], [611, 1546], [395, 1471], [90, 1385], [369, 62]], dtype=np.float32),
+    'world_points': np.array(
+        [[0, 0], [0.2, 0], [0.5, 0], [0.8, 0], [0.1, 1], [0.3, 1], [0.5, 1], [0.7, 1], [1, 1], [1, 0]], dtype=np.float32)
+                 },
+    '6' : {
+        'image_points': np.array(
+            [[1101, 18], [1524, 59], [1784, 79], [2135, 128], [2455, 160], [1239, 1564], [1619, 1538], [1972, 1509], [2283, 1493], [2575, 1465]], dtype=np.float32),
+        'world_points': np.array(
+            [[0, 0], [0.3, 0], [0.5, 0], [0.8, 0], [1.1, 0], [0.1, -1], [0.4, -1], [0.7, -1], [1, -1], [1.3, -1]], dtype=np.float32)
+                    },
+    '7' : {
+        'image_points': np.array(
+            [[459, 881], [863, 889], [1269, 907], [1754, 929], [2075, 947], [463, 1727], [1003, 1753], [1546, 1777], [2041, 14], [1788, 4]], dtype=np.float32),
+        'world_points': np.array(
+            [[0, 0], [0.5, 0], [1, 0], [1.6, 0], [2, 0], [0, -1], [0.7, -1], [1.4, -1], [1.9, 1], [1.6, 1]], dtype=np.float32)
+                    },
+    '8' : {
+        'image_points': np.array(
+            [[342, 1455], [382, 1113], [419, 766], [457, 481], [885, 1493], [916, 1220], [954, 883], [1012, 412], [25, 682], [54, 433]], dtype=np.float32),
+        'world_points': np.array(
+            [[0, 0], [0.6, 0], [1.2, 0], [1.7, 0], [0.2, -1], [0.6, -1], [1.1, -1], [1.8, -1], [1.3, 1], [1.8, 1]], dtype=np.float32)
+                    },
+    '9' : {     # NOTE: camera 9 is actually camera 17 in the farm, we just use 9 for convenience
+        'image_points': np.array(
+            [[550, 372], [570, 744], [589, 1150], [609, 1449], [248, 557], [270, 820], [276, 1038],[293, 1287], [1008, 495], [1012, 813] ,[1031, 1120], [1041, 1483], [1709, 455], [1709, 861], [1717, 1326], [1715, 1700]], dtype=np.float32),
+        'world_points': np.array(
+            [[0, 0], [0.7, 0], [1.5, 0], [2.1, 0], [0.2, -1], [0.8, -1] ,[1.3, -1], [1.9, -1], [0.4, 1], [0.9, 1], [1.4, 1], [2, 1], [0.5, 2], [1, 2], [1.6, 2], [2.1, 2]], dtype=np.float32)
+                    },
+    }
+CAM_POSITIONS = {   # orientation : [yaw_deg, pitch_deg, roll_deg], location : [x, y, z] 
+    '5':{
+        'orientation': [], 'location': np.array([[-0.1], [0.6], [1]])
+    },
+    '6':{
+        'orientation': [], 'location': np.array([[-0.1], [-0.66], [1]])
+    },
+    '7':{
+        'orientation': [], 'location': np.array([[1.1], [0], [2]])
+    },
+    '8':{
+        'orientation': [], 'location': np.array([[0.5], [-2.6], [2]])
+    },
+    '9':{
+        'orientation': [], 'location': np.array([[1.5], [2.66], [1.8]])
+    },
+}
+
+# Clustering settings
+CLUSTER_EPSILON = 0.03                          # Epsilon for DBSCAN clustering -> size of the neighborhood around a point to be considered a cluster
+CLUSTER_MIN_SAMPLES = 1                         # Minimum samples for DBSCAN clustering, i.e. minimum number of cameras detecting the same pig for it to be globally tracked
+MAX_GLOBAL_AGE = 10                             # Maximum age of a global track (cluster) before it is removed
+MAX_CLUSTER_DISTANCE = 0.1                      # Maximum distance between two detections to be considered the same object
+
+
+
+
+"""
+OLD MAPPINGS (For distorted images)
+
 MAPPINGS = {    # NOTE: changed scale to 10 strides = 1 in x axis 
     '5' : {
     'image_points': np.array(
@@ -79,7 +141,4 @@ MAPPINGS = {    # NOTE: changed scale to 10 strides = 1 in x axis
             [[0, 0], [0.4, -1], [1.1, -1], [0.7, 0], [1.5, 0], [0.1, 1], [0.9, 1], [1.7, 1], [0.5, 2], [1.3, 2]], dtype=np.float32)
                     },
     }
-
-# Clustering settings
-CLUSTER_EPSILON = 0.5                           # Epsilon for DBSCAN clustering -> size of the neighborhood around a point to be considered a cluster
-CLUSTER_MIN_SAMPLES = 2                         # Minimum samples for DBSCAN clustering, i.e. minimum number of cameras detecting the same pig for it to be globally tracked
+"""

@@ -2,7 +2,7 @@
 
 import numpy as np
 import pytest
-from src.modules.Mapper import Mapper  # replace with the actual module name where Mapper is defined
+from src.modules.Mapper import Mapper  
 
 @pytest.fixture
 def sample_mappings():
@@ -15,14 +15,22 @@ def sample_mappings():
         }
     }
 
-def test_mapper_initialization(sample_mappings):
-    mapper = Mapper(sample_mappings)
+@pytest.fixture
+def sample_resolution():
+    return (2592, 1944)
+
+@pytest.fixture
+def sample_distortion():
+    return [-0.5, 0.1, 0, 0]
+
+def test_mapper_initialization(sample_mappings, sample_resolution, sample_distortion):
+    mapper = Mapper(sample_mappings, sample_resolution, sample_distortion)
     assert isinstance(mapper.homography_matrices, list)
     assert len(mapper.homography_matrices) == 1
     assert mapper.homography_matrices[0].shape == (3, 3)
 
-def test_valid_transformation(sample_mappings):
-    mapper = Mapper(sample_mappings)
+def test_valid_transformation(sample_mappings, sample_resolution, sample_distortion):
+    mapper = Mapper(sample_mappings, sample_resolution, sample_distortion)
 
     # Define image points to transform
     test_point_1 = np.array([[[854, 213]]], dtype=np.float32)  # shape (1, 1, 2), should map to (6, 0) and (9, 1)
@@ -41,8 +49,8 @@ def test_valid_transformation(sample_mappings):
     assert np.allclose(result1[0], expected1[0], atol=2)
     assert np.allclose(result2[1], expected2[1], atol=3e-1)
 
-def test_invalid_camera_id(sample_mappings):
-    mapper = Mapper(sample_mappings)
+def test_invalid_camera_id(sample_mappings, sample_resolution, sample_distortion):
+    mapper = Mapper(sample_mappings, sample_resolution, sample_distortion)
     test_points = np.array([[0.5, 0.5]], dtype=np.float32)
     
     with pytest.raises(ValueError, match="Camera ID 1 not found in mappings."):

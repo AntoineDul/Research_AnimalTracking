@@ -7,27 +7,32 @@ class PigMonitor:
     
     def __init__(self):
         self.detector = modules.Detector()
-        self.mapper = modules.Mapper(config.MAPPINGS)
+        self.mapper = modules.Mapper(config.MAPPINGS, config.RESOLUTION, config.DISTORTION)
         self.multi_tracker = modules.MultiTracker(config.NUM_CAMERAS, config.FIRST_CAMERA, self.mapper, config.CLUSTER_EPSILON, config.CLUSTER_MIN_SAMPLES, config.MAX_GLOBAL_AGE, config.MAX_CLUSTER_DISTANCE, False)
         self.drawer = modules.Drawer()
         self.file_directory = config.MEDIAFLUX_VIDEO_DIR
         self.sync = modules.Synchronizer(self.file_directory)
         self.video_writer_path = config.PROCESSED_VIDEO_PATH
         self.tracking_history_path = config.TRACKING_HISTORY_PATH
+        self.output_plot_path = config.OUTPUT_PLOT_PATH
         self.first_camera = 5
         self.frame_number = 0
         self.max_frames = 1000
+        
+        self.batch_number = 0
 
     def process_frame(self, frame, frame_count, cam_id=None):
+        # Undistort frame
+        undistorted_frame = self.mapper.undistort_images(frame)
 
         # Detect pigs in the frame
-        detections = self.detector.detect(frame)
+        detections = self.detector.detect(undistorted_frame)
 
         # Update tracks 
         tracks = self.multi_tracker.track(detections, cam_id)
 
         # Draw tracks on the frame
-        display_frame = self.drawer.draw_bboxes(frame.copy(), tracks)
+        display_frame = self.drawer.draw_bboxes(undistorted_frame.copy(), tracks)
         display_frame = self.drawer.add_useful_info(display_frame, frame_count, tracks)
 
         return display_frame, tracks
@@ -189,9 +194,12 @@ class PigMonitor:
                 break
         
         self.multi_tracker.save_tracking_history(self.tracking_history_path)
+        self.drawer.plot_logs(self.tracking_history_path, self.output_plot_path)
 
         # Cleanup
         for cap in video_caps.values():
             cap.release()
         cv2.destroyAllWindows()
 
+    def batch_track():
+        pass

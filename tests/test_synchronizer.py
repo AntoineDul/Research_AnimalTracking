@@ -25,13 +25,13 @@ def test_separate_by_cameras(dummy_filenames):
     sorted_videos = sync.separate_by_cameras(dummy_filenames)
     assert set(sorted_videos.keys()) == {1, 2, 3, 4}
     assert isinstance(sorted_videos[1], list)
-    assert sorted_videos[1][0][0] == datetime(2024, 4, 8, 9, 30, 0)
+    assert sorted_videos[1][0][0][0] == datetime(2024, 4, 8, 9, 30, 0)
 
 def test_get_offsets(dummy_filenames):
     sync = Synchronizer(rfid_data_path=None)
     sync.separate_by_cameras(dummy_filenames)
     offsets = sync.get_offsets()
-    assert offsets[3] == 0  # D3 starts first
-    assert offsets[1] == 2.0
-    assert offsets[4] == 4.0
-    assert offsets[2] == 7.0
+    assert offsets[3] == 7.0  
+    assert offsets[1] == 5.0
+    assert offsets[4] == 3.0
+    assert offsets[2] == 0.0

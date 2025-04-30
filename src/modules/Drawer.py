@@ -1,5 +1,7 @@
 import cv2
 import numpy as np
+import json
+import matplotlib.pyplot as plt
 
 class Drawer:
 
@@ -82,3 +84,37 @@ class Drawer:
             grid = cv2.resize(grid, output_size)
 
         return grid
+    
+    @staticmethod
+    def plot_logs(logs_path, plot_path):
+        with open(logs_path) as f:
+            logs = json.load(f)
+
+        tracks_by_id = {}
+
+        for entry in logs:
+            for track in entry["global tracks"]:
+                track_id = track["id"]
+                x, y = track["center"]
+                if track_id not in tracks_by_id:
+                    tracks_by_id[track_id] = {"x": [], "y": [], "frames": []}
+                tracks_by_id[track_id]["x"].append(x)
+                tracks_by_id[track_id]["y"].append(y)
+                tracks_by_id[track_id]["frames"].append(entry["frame"])
+
+        # Plot
+        plt.figure(figsize=(8, 6))
+        for track_id, track in tracks_by_id.items():
+            print(f"Pig {track_id}: {len(track['x'])} positions")
+            plt.plot(track["x"], track["y"], label=f"Pig {track_id}")
+            plt.scatter(track["x"], track["y"], s=5)
+
+        plt.xlabel("X")
+        plt.ylabel("Y")
+        plt.title("Trajectory of Each Pig")
+        plt.legend()
+        plt.grid(True)
+        plt.axis("equal")
+        plt.savefig(plot_path)
+        plt.show()
+        
