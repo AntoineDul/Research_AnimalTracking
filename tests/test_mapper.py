@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 from src.modules.Mapper import Mapper  
+from src import config
 
 @pytest.fixture
 def sample_mappings():
@@ -55,3 +56,14 @@ def test_invalid_camera_id(sample_mappings, sample_resolution, sample_distortion
     
     with pytest.raises(ValueError, match="Camera ID 1 not found in mappings."):
         mapper.image_to_world_coordinates(1, test_points)
+
+def test_cam_9_map_to_intended_point():
+    mapper = Mapper(mappings=config.MAPPINGS, resolution=config.RESOLUTION,distortion=config.DISTORTION,cam_positions=None)
+    image_to_world_intended = {9:[([580, 900], (1, 0)), ([1016, 883], (1, 1))]}
+    
+    print(mapper.image_to_world_coordinates(9, np.array([[image_to_world_intended[9][1][0]]], dtype=np.float32))) 
+
+    assert (mapper.image_to_world_coordinates(9, np.array([[image_to_world_intended[9][0][0]]], dtype=np.float32))[0] - image_to_world_intended[9][0][0][0]) < 0.01
+    assert (mapper.image_to_world_coordinates(9, np.array([[image_to_world_intended[9][0][0]]], dtype=np.float32))[1] - image_to_world_intended[9][0][0][1]) < 0.01
+    assert (mapper.image_to_world_coordinates(9, np.array([[image_to_world_intended[9][1][0]]], dtype=np.float32))[0] - image_to_world_intended[9][1][0][0]) < 0.01
+    assert (mapper.image_to_world_coordinates(9, np.array([[image_to_world_intended[9][1][0]]], dtype=np.float32))[1] - image_to_world_intended[9][1][0][1]) < 0.01

@@ -27,9 +27,22 @@ class Mapper:
 
         homography_matrix = self.homography_matrices[cam_id % self.cameras[0]]
         world_points = cv2.perspectiveTransform(image_points, homography_matrix)[0][0]
-        print("World Points: ", world_points)
+        # print("World Points: ", world_points)
         return world_points
-    
+
+    def batch_to_world_coords(self, paths_list, cam_id): # paths_list = [ [((x1, y1), f1), ((x2, y2), f2), ...], ... ]
+        transformed_paths = []
+        for path in paths_list:
+            transformed_path = []
+            for i in range(len(path)):
+                data = path[i]
+                cam_coords = np.array([[[data[0][0], data[0][1]]]], dtype=np.float32) # Shape (1, 1, 2)
+                global_coords = self.image_to_world_coordinates(cam_id, cam_coords)
+                global_data = ((float(global_coords[0]), float(global_coords[1])), data[1])
+                transformed_path.append(global_data)
+            transformed_paths.append(transformed_path)
+        return transformed_paths
+
     def world_to_image_coordinates(self):
         # For backtracking 
         pass

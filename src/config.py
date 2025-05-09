@@ -11,15 +11,18 @@ MEDIAFLUX_VIDEO_DIR = "C:\\Users\\antoi\\Documents\\Unimelb_Mediaflux\\2024-10-1
 # Paths
 TRACKING_HISTORY_PATH = os.path.join(OUTPUT_DIR, "track_history\\tracking_history.json")
 OUTPUT_PLOT_PATH = os.path.join(OUTPUT_DIR, "track_history\\global_movements.png")
+BATCH_PLOTS_PATH = os.path.join(OUTPUT_DIR, "batch_plots")
 PROCESSED_VIDEO_PATH = os.path.join(OUTPUT_DIR, "processed_videos\\tracked_pigs.avi")
 YOLO_MODEL_PATH = os.path.join(MODEL_DIR, "yolov11_pig_v2.pt")
 RFID_PATH = os.path.join(DATA_DIR, "RFID", "21-056 Drinker Raw Data 26Jun2024-18Sep2024.xlsx")
 
 # Farm settings
+NUM_PIGS = 20    #15                            # Total number of pigs in the pen
 NUM_CAMERAS = 5                                 # Number of cameras in the pen monitored
 FIRST_CAMERA = 5                                # First camera ID in the pen monitored (pen 2)
 RESOLUTION = (2592, 1944)                       # Camera resolution from official datasheet
 DISTORTION = [-0.5, 0.1, 0, 0]                  # Distortion parameters used to undistort fisheye (found thorugh trial and error)
+CAM_FULLY_OVERLAPPED = [5, 6, 7]                # List of cameras whose views are fully included in another camera view (no possibility of detecting a pig ONLY from these cams)
 
 # Select detection model and tracking method
 DETECTION_METHOD = "YOLO"                       # Options: "YOLO", "ColorSegmentation"
@@ -27,7 +30,7 @@ TRACKING_METHOD = "GREEDY"                      # Options: "GREEDY", ("DEEP_SORT
 
 # Detection settings
 YOLO_CONF_THRESHOLD = 0.65                      # Minimum confidence score for detection
-YOLO_IMGSZ = 416                                # Image size expected by YOLO model 
+YOLO_IMGSZ = 832                                # Image size expected by YOLO model 
 LOWER_COLOR_RANGE = [0, 50, 50]                 # Lower bound for color detection in HSV space
 UPPER_COLOR_RANGE = [30, 255, 255]              # Upper bound for color detection in HSV space
 CONTOUR_AREA_THRESHOLD = 1000                   # Minimum area of contour to be considered a detection
@@ -37,6 +40,7 @@ MAX_TRACK_AGE = 10                              # Max frames a lost object remai
 IOU_THRESHOLD = 0.6                             # Intersection over Union threshold for tracking
 MAX_DISTANCE = 50                               # Maximum distance for matching detections to existing tracks   
 ALPHA = 0.5                                     # Weight for IoU in cost function, weight of distance is (1 - alpha)
+MAX_PIG_MVMT_BETWEEN_TWO_FRAMES = 0.1          # max distance between two points in a batch to be considered from same paths and not outliers
 
 # Video processing settings
 FRAME_SKIP = 2                                  # Number of frames to skip for processing
@@ -103,7 +107,9 @@ CLUSTER_MIN_SAMPLES = 1                         # Minimum samples for DBSCAN clu
 MAX_GLOBAL_AGE = 10                             # Maximum age of a global track (cluster) before it is removed
 MAX_CLUSTER_DISTANCE = 0.1                      # Maximum distance between two detections to be considered the same object
 
-
+# Batch analysis parameters
+FRECHET_THRESHOLD = 1                           #TODO
+BATCH_SIZE = 10                                 #TODO
 
 
 """

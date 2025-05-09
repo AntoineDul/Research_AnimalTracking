@@ -35,8 +35,8 @@ class Synchronizer:
             # fps = 20
             offset_sec = camera_offsets[cam_id]
             offset_frames = int(offset_sec * fps)
-            print("FPS", fps)
-            print("FRAME OFFSET", offset_frames)
+            print(f"FPS {cam_id}:", fps)
+            print(f"FRAME OFFSET CAM {cam_id}:", offset_frames)
             cap.set(cv2.CAP_PROP_POS_FRAMES, offset_frames)
             video_caps[cam_id] = cap
             fps_dict[cam_id] = fps

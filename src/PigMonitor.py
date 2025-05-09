@@ -18,8 +18,7 @@ class PigMonitor:
         self.first_camera = 5
         self.frame_number = 0
         self.max_frames = 1000
-        
-        self.batch_number = 0
+
 
     def process_frame(self, frame, frame_count, cam_id=None):
         # Undistort frame
@@ -36,6 +35,18 @@ class PigMonitor:
         display_frame = self.drawer.add_useful_info(display_frame, frame_count, tracks)
 
         return display_frame, tracks
+    
+    def process_batch_frame(self, frame, frame_count, cam_id):
+        # Undistort frame
+        undistorted_frame = self.mapper.undistort_images(frame)
+
+        # Detect pigs in the frame
+        detections = self.detector.detect(undistorted_frame)
+
+        # Update tracks 
+        tracks = self.multi_tracker.track(detections, cam_id)
+
+        return tracks
 
     def monitor(self, video_path):
         """Processes a single video file."""
@@ -121,8 +132,9 @@ class PigMonitor:
         
         print(f"Tracking complete. Output saved to {self.video_writer_path}")
 
-    def multi_monitor(self):
+    def set_up_monitoring(self):
         """Processes all video files in the directory specified in config."""
+
         # Check if directory exists
         if not os.path.exists(self.file_directory):
             print(f"Error: Directory {self.file_directory} not found.")
@@ -130,19 +142,18 @@ class PigMonitor:
         
         # Get all video files in the directory
         files = os.listdir(self.file_directory)
-        video_files = [f for f in files if f.endswith(('.mp4', '.avi'))]
+        video_files = [f for f in files if f.endswith(('.mp3', '.avi', '.mp4'))]
 
         if not video_files:
             print("No video files found in the directory.")
             return
 
         video_caps = {}
-        fps_dict = {}
 
         # Synchronize videos
         sorted_videos = self.sync.separate_by_cameras(video_files)
         camera_offsets = self.sync.get_offsets()
-        video_caps, fps_dict = self.sync.synchronize(sorted_videos, camera_offsets)
+        video_caps, _ = self.sync.synchronize(sorted_videos, camera_offsets)
         
         print("VIDEO CAPTURE OBJECTS INITIALIZED")
         print(video_caps)
@@ -155,6 +166,15 @@ class PigMonitor:
         height = config.OUTPUT_VIDEO_HEIGHT
         fps = config.OUTPUT_VIDEO_FPS
         out = cv2.VideoWriter(self.video_writer_path, fourcc, fps, (width, height))
+
+        assert video_caps is not None
+        assert out is not None
+
+        return video_caps, out
+
+    def multi_monitor(self):
+
+        video_caps, out = self.set_up_monitoring()
 
         frame_count = 0
 
@@ -201,5 +221,111 @@ class PigMonitor:
             cap.release()
         cv2.destroyAllWindows()
 
-    def batch_track():
-        pass
+    def batch_monitor(self):
+        
+        self.multi_tracker.global_batches_tracks = [[] for _ in range(config.NUM_PIGS)]
+
+        video_caps, out = self.set_up_monitoring()
+
+        batch_count = 0
+        frame_count = 0
+
+        a = True
+        
+        while a:
+            paths = {}
+
+            for i in range(config.NUM_CAMERAS):
+                paths[i + self.first_camera] = [[] for _ in range(config.NUM_PIGS)]
+
+            all_successful = True
+
+            frame_count += 1
+            # Skip frames to improve performance (process every 2nd frame)
+            if frame_count % config.FRAME_SKIP != 0 and frame_count > 1:
+                continue
+
+            for batch_frame_number in range(config.BATCH_SIZE):
+
+                for cam_id, cap in video_caps.items():
+                    success, frame = cap.read()
+
+                    if not success:
+                        print(f"Camera {cam_id} has no more frames.")       # TODO : implement queue logic to handle next video
+                        all_successful = False
+                        break
+
+                    # Process frames
+                    tracks = self.process_batch_frame(frame, frame_count, cam_id)
+
+                    # print(f"\ntracks for cam {cam_id}: {tracks}\n")
+                    # print(f"iteration tracks: {tracks}")
+
+                    for track in tracks:
+                        paths[cam_id][track['id']].append((track['center'], batch_frame_number))
+
+
+                if not all_successful:
+                    break
+            
+            # print("-----------------BATCH SUMMARY (before merging)--------------------")
+            for cam_id, batch in paths.items():
+                paths[cam_id] = self.mapper.batch_to_world_coords(batch, cam_id)           
+                
+                # print(f"\n\nCAMERA {cam_id} // \n ORIGINAL BATCH: {batch} \n\n GLOBAL COORDS BATCH: {paths[cam_id]}")
+
+            # print("--------------------------------------------------------------")
+
+            clean_paths = self.multi_tracker.handle_outliers(config.MAX_PIG_MVMT_BETWEEN_TWO_FRAMES, paths) 
+
+            paths_7_17 = self.multi_tracker.batch_match(clean_paths[7], clean_paths[9], 7, 17)  # Match batch paths across cameras
+            paths_8_7_17 = self.multi_tracker.batch_match(clean_paths[8], paths_7_17, 8, None)
+            paths_5_7_8_17 = self.multi_tracker.batch_match(clean_paths[5], paths_8_7_17, 5, None)
+            all_paths_merged = self.multi_tracker.batch_match(clean_paths[6], paths_5_7_8_17, 6, None)
+
+            # print(f"\n\nALL PATHS MERGED:")
+            # print(all_paths_merged)
+            # print(f"global batches tracks: \n{self.multi_tracker.global_batches_tracks}")
+            
+            # need to make sure this extends right path
+            # TODO inaccuracies here 
+            for idx, path in enumerate(all_paths_merged):
+                if idx == 0: continue
+                if batch_count == 0:
+                    self.multi_tracker.global_batches_tracks[idx].extend(path)
+                else:
+                    placed = False
+                    dist_to_closest_endpoint = 1000
+                    best_path_idx = None
+                    possible_indices = [i for i in range(len(self.multi_tracker.global_batches_tracks))]
+                    for track_idx in possible_indices:
+                        if len(self.multi_tracker.global_batches_tracks[track_idx]) > 0:
+                            distance = self.multi_tracker.euclidean_distance(path[0][0], self.multi_tracker.global_batches_tracks[track_idx][-1][0])
+                            if distance < dist_to_closest_endpoint:
+                                dist_to_closest_endpoint = distance
+                                best_path_idx = track_idx
+                    possible_indices.remove(best_path_idx)
+                    self.multi_tracker.global_batches_tracks[best_path_idx].extend(path)
+                    placed = True
+                    
+                    if placed == False:
+                        raise ValueError
+        
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        
+            batch_count += 1
+            if batch_count == 10: 
+                a=False
+
+        self.drawer.plot_batch_paths(self.multi_tracker.global_batches_tracks, config.BATCH_PLOTS_PATH)
+        # self.multi_tracker.save_tracking_history(self.tracking_history_path)
+        # self.drawer.plot_logs(self.tracking_history_path, self.output_plot_path)
+
+        # Cleanup
+        for cap in video_caps.values():
+            cap.release()
+        cv2.destroyAllWindows()
+
+
+

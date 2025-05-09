@@ -133,7 +133,6 @@ class GreedyTracker(BaseTracker):
             for track in self.tracked:
                 print(f"Track ID: {track['id']}, Age: {track['age']}, BBox: {track['bbox_xyxy']}, Center: {track['center']}, Conf: {track['conf']}")
         
-
         return self.tracked
     
     def get_tracks(self):

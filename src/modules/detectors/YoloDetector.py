@@ -10,14 +10,14 @@ class YoloDetector(BaseDetector):
 
     def resize_output(self, original_h, original_w, x1, y1, x2, y2):
         """Resize the bounding box coordinates back to the original image size."""
-        x1 = int(x1 * original_w / self.yolo_imgsz)
-        y1 = int(y1 * original_h / self.yolo_imgsz)
-        x2 = int(x2 * original_w / self.yolo_imgsz)
-        y2 = int(y2 * original_h / self.yolo_imgsz)
-        cx = abs((x1 - x2) // 2)
-        cy = abs((y1 - y2) // 2)
+        x_1 = int(x1 * original_w / self.yolo_imgsz)
+        y_1 = int(y1 * original_h / self.yolo_imgsz)
+        x_2 = int(x2 * original_w / self.yolo_imgsz)
+        y_2 = int(y2 * original_h / self.yolo_imgsz)
+        cx = abs((x_1 + x_2) // 2)
+        cy = abs((y_1 + y_2) // 2)
 
-        return x1, y1, x2, y2, cx, cy
+        return x_1, y_1, x_2, y_2, cx, cy
 
     def detect(self, frame, print_detected=False):
         # TODO: Add image enhancement before processing them

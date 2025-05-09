@@ -5,7 +5,7 @@ def test_detector_initialization_and_outputs():
     detector = Detector()
     assert detector is not None, "Detector should be initialized successfully."
 
-    detections = detector.detect("data/test_frames/test_pigs_2.jpg")
+    detections = detector.detect("outputs/undistorted_cameras/camera_17_k1_-0.5_k2_0.1.png")
     assert detections is not None, "Detector should return detections."
 
     assert isinstance(detections, list), "Detections should be a list."
@@ -13,7 +13,8 @@ def test_detector_initialization_and_outputs():
     
     
     for detection in detections:
-        print(detections)
+        print("------------")
+        print(detection)
 
         # Check if each detection has the required keys
         assert isinstance(detection, dict), "Each detection should be a dictionary."
