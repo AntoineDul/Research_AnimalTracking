@@ -223,7 +223,7 @@ class PigMonitor:
 
     def batch_monitor(self):
         
-        self.multi_tracker.global_batches_tracks = [[] for _ in range(config.NUM_PIGS)]
+        self.multi_tracker.global_batches_tracks = [[] for _ in range(config.NUM_PIGS + 10)]
 
         video_caps, out = self.set_up_monitoring()
 
@@ -268,23 +268,20 @@ class PigMonitor:
                 if not all_successful:
                     break
             
-            # print("-----------------BATCH SUMMARY (before merging)--------------------")
-            for cam_id, batch in paths.items():
-                paths[cam_id] = self.mapper.batch_to_world_coords(batch, cam_id)           
-                
-                # print(f"\n\nCAMERA {cam_id} // \n ORIGINAL BATCH: {batch} \n\n GLOBAL COORDS BATCH: {paths[cam_id]}")
+            print(f"PATHS: {paths}")
 
-            # print("--------------------------------------------------------------")
+            # Correct bias and handle outliers in the detected paths 
+            unbiased_paths = self.mapper.fix_paths_bias(paths, config.THALES_SCALE, config.CAM_POSITIONS)
+            clean_paths = self.multi_tracker.handle_outliers(config.MAX_PIG_MVMT_BETWEEN_TWO_FRAMES, unbiased_paths) 
 
-            clean_paths = self.multi_tracker.handle_outliers(config.MAX_PIG_MVMT_BETWEEN_TWO_FRAMES, paths) 
-
+            # Merge paths together sequentially
             paths_7_17 = self.multi_tracker.batch_match(clean_paths[7], clean_paths[9], 7, 17)  # Match batch paths across cameras
             paths_8_7_17 = self.multi_tracker.batch_match(clean_paths[8], paths_7_17, 8, None)
             paths_5_7_8_17 = self.multi_tracker.batch_match(clean_paths[5], paths_8_7_17, 5, None)
             all_paths_merged = self.multi_tracker.batch_match(clean_paths[6], paths_5_7_8_17, 6, None)
 
-            # print(f"\n\nALL PATHS MERGED:")
-            # print(all_paths_merged)
+            print(f"\n\nALL PATHS MERGED:")
+            print(all_paths_merged)
             # print(f"global batches tracks: \n{self.multi_tracker.global_batches_tracks}")
             
             # need to make sure this extends right path
@@ -310,15 +307,16 @@ class PigMonitor:
                     
                     if placed == False:
                         raise ValueError
-        
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+
+            
         
             batch_count += 1
-            if batch_count == 10: 
+            if batch_count == 1:
+                for i in [5, 6, 7, 8, 9]:
+                    self.drawer.plot_batch_paths(clean_paths[i], i, config.BATCH_SIZE, config.BATCH_PLOTS_PATH) 
                 a=False
 
-        self.drawer.plot_batch_paths(self.multi_tracker.global_batches_tracks, config.BATCH_PLOTS_PATH)
+        self.drawer.plot_batch_paths(self.multi_tracker.global_batches_tracks, "overall", config.BATCH_SIZE, config.BATCH_PLOTS_PATH)
         # self.multi_tracker.save_tracking_history(self.tracking_history_path)
         # self.drawer.plot_logs(self.tracking_history_path, self.output_plot_path)
 

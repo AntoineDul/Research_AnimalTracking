@@ -120,9 +120,9 @@ class Drawer:
         plt.show()
 
     @staticmethod
-    def plot_batch_paths(data, output_path):
+    def plot_batch_paths(data, cam_id, batch_size, output_path):
         plt.figure(figsize=(8, 6))
-        plt.title(f'Overall view - Paths')
+        plt.title(f'Cam {cam_id} view - Paths - {batch_size}')
         cmap = cm.get_cmap('tab20', len(data))  # Use a colormap with enough colors
 
         for i, path in enumerate(data):
@@ -140,8 +140,8 @@ class Drawer:
         plt.ylabel('Y coordinate')
         plt.legend()
         plt.grid(True)
-        plt.savefig(f"{output_path}\\cam_overall_batch_plot.jpg")
-        print(f"Batch plot for camera overall saved.")
+        plt.savefig(f"{output_path}\\cam_{cam_id}_batch_plot.jpg")
+        print(f"Batch plot for camera {cam_id} saved.")
         # plt.show()
 
             

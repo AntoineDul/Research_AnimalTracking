@@ -1,9 +1,10 @@
 import numpy as np
 import cv2
+import pickle
 
 class Mapper:
 
-    def __init__(self, mappings, resolution, distortion, cam_positions=None):
+    def __init__(self, mappings, resolution, distortion):
         self.w, self.h = resolution
         self.k = np.array([
                 [self.w, 0, self.w / 2],
@@ -15,11 +16,6 @@ class Mapper:
         self.homography_matrices = [
             cv2.findHomography(mapping['image_points'], mapping['world_points'])[0] for mapping in mappings.values()
         ]
-
-        # Triangulation variables
-        # self.rotations = [self.get_rotation_matrix(cam_positions[i]['orientation'][0], cam_positions[i]['orientation'][1], cam_positions[i]['orientation'][2]) for i in cam_positions.keys()]
-        # self.translations = [cam_positions[i]['location'] for i in cam_positions.keys()]
-        # self.P = [self.k @ np.hstack(r, t) for r, t in zip(self.translations, self.rotations)] # Projection matrices
 
     def image_to_world_coordinates(self, cam_id, image_points):
         if cam_id not in self.cameras:
@@ -78,3 +74,77 @@ class Mapper:
         ])
         return Rz @ Ry @ Rx
     
+    def load_model(self, cam_id, models_dir):
+        path = f"{models_dir}/cam_{cam_id}_bias_model.pkl"
+        with open(path, "rb") as f:
+            models = pickle.load(f)
+            model_dx = models["dx"]
+            model_dy = models["dy"]
+        return model_dx, model_dy
+
+    @staticmethod
+    def correct_bias(input_position:tuple, cam_id:int, scales:dict, camera_positions:dict):
+
+        # Camera position
+        cam_pos = camera_positions[cam_id]
+
+        # Convert relative position to meters
+        rel_x = (input_position[0] - cam_pos[0])
+        rel_y = (input_position[1] - cam_pos[1])
+        # print(f"point relative to position camera: ({rel_x}, {rel_y})")
+
+        # Apply Thales scaling 
+        cam_scale_x, cam_scale_y = scales[cam_id]
+        
+        # If pigs are close to cam position, no need to unbias
+        if abs(rel_x) < 0.4 and abs(rel_y) < 0.4:
+            return input_position
+
+        elif abs(rel_x) < 0.4 and abs(rel_y)>= 0.4:
+            corrected_rel_y = rel_y * cam_scale_y
+            unbiased_y = cam_pos[1] + corrected_rel_y
+            return (input_position[0], unbiased_y)
+        
+        elif abs(rel_x) >= 0.4 and abs(rel_y) < 0.4:
+            corrected_rel_x = rel_x * cam_scale_x
+            unbiased_x = cam_pos[0] + corrected_rel_x
+            return (unbiased_x, input_position[1])
+        
+        else:
+
+            corrected_rel_x = rel_x * cam_scale_x
+            corrected_rel_y = rel_y * cam_scale_y
+
+            # Final unbiased position in tiles
+            unbiased_x = cam_pos[0] + corrected_rel_x
+            unbiased_y = cam_pos[1] + corrected_rel_y
+
+            return (unbiased_x, unbiased_y)
+
+    def fix_paths_bias(self, paths:dict, scales:dict, cam_positions:dict):
+        unbiased_paths = {}
+
+        for cam_id, batch in paths.items():
+            new_batch = []
+            
+            # translate to real world coord
+            world_coord_batch = self.batch_to_world_coords(batch, cam_id) 
+
+            # apply bias correction on each point of each path
+            for path in world_coord_batch:
+                if len(path) == 0:
+                    continue
+                new_path = []
+                for point in path:
+                    if len(point) == 0: 
+                        continue
+                    # print(point)
+                    unbiased_point = self.correct_bias(point[0], cam_id, scales, cam_positions)
+                    # print(f"unbiased point : {unbiased_point}")
+                    assert(isinstance(point, tuple))
+
+                    new_path.append((unbiased_point, point[1]))
+                new_batch.append(new_path)
+            unbiased_paths[cam_id] = new_batch
+
+        return unbiased_paths

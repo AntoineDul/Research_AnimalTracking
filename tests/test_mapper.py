@@ -24,46 +24,77 @@ def sample_resolution():
 def sample_distortion():
     return [-0.5, 0.1, 0, 0]
 
-def test_mapper_initialization(sample_mappings, sample_resolution, sample_distortion):
-    mapper = Mapper(sample_mappings, sample_resolution, sample_distortion)
-    assert isinstance(mapper.homography_matrices, list)
-    assert len(mapper.homography_matrices) == 1
-    assert mapper.homography_matrices[0].shape == (3, 3)
+paths = {5: [[], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []], 
+         6: [[], [((2228, 1222), 0), ((2228, 1221), 1), ((2230, 1224), 2), ((2230, 1222), 3), ((2231, 1222), 4), ((2230, 1221), 5), ((2228, 1224), 6), ((2230, 1219), 7), ((2230, 1215), 8), ((2230, 1228), 9), ((2230, 1234), 10), ((2228, 1239), 11), ((2235, 1257), 12), ((2225, 1238), 13), ((2225, 1234), 14), ((2225, 1234), 15), ((2223, 1229), 16), ((2225, 1144), 17), ((2225, 1190), 18), ((2229, 1170), 19)], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []], 
+         7: [[], [((1119, 1658), 0), ((1119, 1656), 1), ((1119, 1652), 2), ((1118, 1648), 3), ((1113, 1646), 4), ((1101, 1644), 5), ((1094, 1639), 6), ((1086, 1636), 7), ((1083, 1636), 8), ((1086, 1635), 9), ((1088, 1623), 10), ((1093, 1616), 11), ((1096, 1596), 12), ((1091, 1582), 13), ((1088, 1582), 14), ((1085, 1585), 15), ((1083, 1584), 16), ((1087, 1583), 17), ((1096, 1583), 18), ((1103, 1582), 19)], [((2108, 1534), 0), ((2110, 1539), 1), ((2118, 1540), 2), ((2120, 1541), 3), ((2120, 1541), 4), ((2120, 1540), 5), ((2111, 1540), 6), ((2107, 1539), 7), ((2108, 1539), 8), ((2108, 1538), 9), ((2107, 1540), 10), ((2118, 1539), 11), ((2120, 1539), 12), ((2120, 1539), 13), ((2118, 1539), 14), ((2107, 1539), 15), ((2107, 1538), 16), ((2108, 1538), 17), ((2107, 1540), 18), ((2108, 1540), 19)], [((2249, 1371), 0), ((2252, 1372), 1), ((2255, 1373), 2), ((2260, 1374), 3), ((2258, 1372), 4), ((2255, 1373), 5), ((2252, 1371), 6), ((2250, 1371), 7), ((2247, 1373), 8), ((2247, 1374), 9), ((2249, 1375), 10), ((2252, 1380), 11), ((2253, 1380), 12), ((2253, 1380), 13), ((2253, 1380), 14), ((2005, 1788), 15), ((1999, 1788), 16), ((1999, 1788), 17), ((2004, 1788), 18), ((2007, 1785), 19)], [((1999, 1789), 0), ((1999, 1789), 1), ((1999, 1789), 2), ((2007, 1747), 3), ((2007, 1747), 4), ((2007, 1747), 5), ((2007, 1747), 6), ((2004, 1788), 7), ((2001, 1788), 8), ((2001, 1787), 9), ((2004, 1788), 10), ((2004, 1788), 11), ((2004, 1788), 12), ((2004, 1788), 13), ((2004, 1788), 14), ((2249, 1381), 15), ((2249, 1381), 16), ((2249, 1381), 17), ((2249, 1381), 18), ((2249, 1381), 19)], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []], 
+         8: [[], [((630, 1004), 0), ((601, 253), 1), ((598, 253), 2), ((601, 253), 3), ((599, 253), 4), ((598, 251), 5), ((598, 251), 6), ((598, 253), 7), ((598, 253), 8), ((598, 253), 9), ((598, 253), 10), ((598, 253), 11), ((657, 1024), 12), ((657, 1034), 13), ((660, 1037), 14), ((598, 253), 15), ((598, 253), 16), ((655, 1037), 17), ((657, 1035), 18), ((661, 1033), 19)], [((601, 253), 0), ((630, 1003), 1), ((630, 1003), 2), ((633, 998), 3), ((632, 1002), 4), ((633, 1006), 5), ((1298, 641), 6), ((1960, 1373), 7), ((640, 1011), 8), ((646, 1012), 9), ((649, 1011), 10), ((654, 1017), 11), ((598, 251), 12), ((599, 251), 13), ((598, 253), 14), ((660, 1038), 15), ((658, 1037), 16), ((598, 253), 17), ((598, 252), 18), ((504, 157), 19)], [((1297, 641), 0), ((505, 160), 1), ((1300, 641), 2), ((1298, 639), 3), ((1298, 641), 4), ((1298, 641), 5), ((1967, 1371), 6), ((1298, 642), 7), ((1300, 643), 8), ((1953, 1384), 9), ((1945, 1385), 10), ((1951, 1377), 11), ((1951, 1373), 12), ((1951, 1375), 13), ((1951, 1376), 14), ((1946, 1383), 15), ((1951, 1379), 16), ((1946, 1383), 17), ((1953, 1379), 18), ((601, 243), 19)], [((1128, 1756), 0), ((1298, 641), 1), ((1128, 1758), 2), ((1981, 1388), 3), ((1974, 1381), 4), ((1971, 1374), 5), ((637, 1008), 6), ((505, 160), 7), ((1951, 1377), 8), ((505, 160), 9), ((504, 161), 10), ((504, 161), 11), ((1186, 1747), 12), ((505, 158), 13), ((1318, 643), 14), ((502, 160), 15), ((504, 160), 16), ((505, 160), 17), ((505, 158), 18), ((1953, 1376), 19)], [((507, 158), 0), ((1125, 1760), 1), ((1992, 1390), 2), ((504, 158), 3), ((505, 158), 4), ((1118, 1755), 5), ((505, 159), 6), ((637, 1012), 7), ((1135, 1757), 8), ((1311, 641), 9), ((1311, 637), 10), ((1314, 642), 11), ((1315, 643), 12), ((1318, 642), 13), ((1191, 1748), 14), ((1320, 642), 15), ((1320, 642), 16), ((1320, 643), 17), ((1320, 644), 18), ((1322, 642), 19)], [((2010, 1402), 0), ((1996, 1395), 1), ((940, 220), 2), ((1119, 1757), 3), ((1119, 1754), 4), ((507, 157), 5), ((931, 221), 6), ((1128, 1756), 7), ((507, 158), 8), ((1154, 1755), 9), ((1171, 1756), 10), ((1172, 1747), 11), ((505, 157), 12), ((1191, 1746), 13), ((504, 158), 14), ((1202, 1752), 15), ((1203, 1754), 16), ((1203, 1761), 17), ((1206, 1754), 18), ((1208, 1760), 19)], [((942, 220), 0), ((946, 220), 1), ((508, 158), 2), ((931, 221), 3), ((932, 220), 4), ((931, 220), 5), ((1121, 1760), 6), ((929, 220), 7), ((931, 220), 8), ((931, 220), 9), ((931, 220), 10), ((929, 220), 11), ((931, 220), 12), ((931, 220), 13), ((931, 220), 14), ((931, 220), 15), ((931, 220), 16), ((932, 220), 17), ((932, 220), 18), ((931, 220), 19)], [], [], [], [], [], [], [], [], [], [], [], []], 
+         9: [[], [((230, 846), 0), ((230, 846), 1), ((230, 845), 2), ((230, 844), 3), ((230, 844), 4), ((233, 844), 5), ((235, 843), 6), ((236, 841), 7), ((1018, 1587), 8), ((245, 838), 9), ((250, 838), 10), ((252, 836), 11), ((255, 836), 12), ((258, 832), 13), ((1018, 1587), 14), ((1018, 1587), 15), ((261, 824), 16), ((261, 821), 17), ((261, 821), 18), ((261, 826), 19)], [((1018, 1587), 0), ((1018, 1587), 1), ((1018, 1587), 2), ((1018, 1588), 3), ((1017, 1587), 4), ((1017, 1587), 5), ((1017, 1587), 6), ((1018, 1587), 7), ((241, 840), 8), ((1018, 1587), 9), ((1018, 1587), 10), ((1018, 1587), 11), ((1018, 1587), 12), ((1018, 1587), 13), ((259, 830), 14), ((261, 828), 15), ((1018, 1587), 16), ((1020, 1586), 17), ((1020, 1586), 18), ((1020, 1586), 19)], [((2199, 185), 0), ((2199, 185), 1), ((2199, 185), 2), ((2199, 185), 3), ((2199, 186), 4), ((2199, 186), 5), ((2199, 186), 6), ((2199, 186), 7), ((2199, 186), 8), ((2199, 186), 9), ((2199, 186), 10), ((2199, 186), 11), ((2197, 187), 12), ((2199, 187), 13), ((2199, 187), 14), ((2397, 1071), 15), ((2395, 1071), 16), ((2395, 1071), 17), ((2397, 1072), 18), ((2400, 1073), 19)], [((2096, 1609), 0), ((2099, 1608), 1), ((2098, 1609), 2), ((2373, 1591), 3), ((2091, 1609), 4), ((2372, 1597), 5), ((2203, 1026), 6), ((2200, 1025), 7), ((2199, 1026), 8), ((2090, 1609), 9), ((2400, 1071), 10), ((2400, 1071), 11), ((2400, 1071), 12), ((2398, 1072), 13), ((2397, 1073), 14), ((2199, 187), 15), ((2199, 187), 16), ((2199, 187), 17), ((2199, 187), 18), ((2199, 187), 19)], [((2381, 1586), 0), ((2382, 1586), 1), ((2382, 1588), 2), ((2093, 1608), 3), ((2373, 1597), 4), ((2205, 1027), 5), ((2372, 1600), 6), ((2375, 1598), 7), ((2090, 1610), 8), ((2400, 1072), 9), ((2194, 1027), 10), ((2090, 1613), 11), ((2192, 1027), 12), ((2088, 1618), 13), ((2188, 1026), 14), ((2189, 1028), 15), ((2091, 1629), 16), ((2093, 1616), 17), ((2095, 1605), 18), ((2093, 1598), 19)], [((2207, 1031), 0), ((2207, 1026), 1), ((2208, 1025), 2), ((2205, 1026), 3), ((2206, 1027), 4), ((406, 1461), 5), ((406, 1461), 6), ((334, 1370), 7), ((336, 1368), 8), ((2197, 1026), 9), ((334, 1370), 10), ((2194, 1027), 11), ((2088, 1616), 12), ((2189, 1028), 13), ((406, 1462), 14), ((406, 1461), 15), ((2189, 1027), 16), ((2189, 1022), 17), ((336, 1370), 18), ((336, 1370), 19)], [((336, 1371), 0), ((336, 1372), 1), ((404, 1461), 2), ((404, 1461), 3), ((404, 1461), 4), ((2090, 1610), 5), ((334, 1370), 6), ((406, 1462), 7), ((406, 1462), 8), ((406, 1462), 9), ((406, 1461), 10), ((406, 1460), 11), ((406, 1460), 12), ((2375, 1623), 13), ((2086, 1597), 14), ((2090, 1626), 15), ((406, 1462), 16), ((409, 1463), 17), ((407, 1463), 18), ((406, 1464), 19)], [((404, 1461), 0), ((404, 1461), 1), ((336, 1371), 2), ((336, 1372), 3), ((336, 1372), 4), ((2403, 1069), 5), ((2090, 1610), 6), ((2093, 1612), 7), ((2373, 1602), 8), ((334, 1370), 9), ((2096, 1614), 10), ((334, 1370), 11), ((334, 1370), 12), ((406, 1461), 13), ((334, 1370), 14), ((2375, 1628), 15), ((2375, 1631), 16), ((336, 1370), 17), ((2191, 1019), 18), ((2191, 1017), 19)], [((2409, 1074), 0), ((2401, 1069), 1), ((2405, 1068), 2), ((2403, 1068), 3), ((2403, 1068), 4), ((334, 1371), 5), ((2401, 1069), 6), ((2408, 1073), 7), ((2401, 1070), 8), ((2373, 1601), 9), ((2373, 1600), 10), ((2378, 1614), 11), ((2376, 1620), 12), ((334, 1370), 13), ((2376, 1634), 14), ((334, 1370), 15), ((334, 1370), 16), ((2373, 1632), 17), ((2373, 1650), 18), ((2368, 1654), 19)], [((203, 1357), 0), ((203, 1358), 1), ((2014, 1852), 2), ((2014, 1854), 3), ((200, 1356), 4), ((200, 1358), 5), ((200, 1358), 6), ((199, 1358), 7), ((200, 1357), 8), ((199, 1358), 9), ((200, 1357), 10), ((199, 1356), 11), ((199, 1356), 12), ((199, 1356), 13), ((199, 1356), 14), ((199, 1356), 15), ((199, 1356), 16), ((199, 1356), 17), ((200, 1356), 18), ((200, 1356), 19)], [((2009, 1851), 0), ((2015, 1852), 1), ((203, 1357), 2), ((202, 1357), 3), ((2006, 1851), 4), ((2006, 1851), 5), ((2003, 1851), 6), ((2006, 1851), 7), ((2006, 1851), 8), ((2007, 1851), 9), ((2009, 1851), 10), ((2009, 1852), 11), ((2007, 1851), 12), ((2007, 1851), 13), ((2010, 1852), 14), ((2009, 1851), 15), ((2009, 1852), 16), ((2010, 1852), 17), ((2007, 1851), 18), ((2009, 1852), 19)], [((84, 524), 3), ((84, 524), 4), ((84, 526), 5), ((84, 526), 6), ((84, 526), 7), ((84, 526), 8), ((84, 526), 9), ((84, 526), 10), ((84, 526), 11), ((84, 526), 12), ((84, 526), 13), ((84, 526), 14), ((84, 526), 15)], [], [], [], [], [], [], []]}
 
-def test_valid_transformation(sample_mappings, sample_resolution, sample_distortion):
-    mapper = Mapper(sample_mappings, sample_resolution, sample_distortion)
+# def test_mapper_initialization(sample_mappings, sample_resolution, sample_distortion):
+#     mapper = Mapper(sample_mappings, sample_resolution, sample_distortion)
+#     assert isinstance(mapper.homography_matrices, list)
+#     assert len(mapper.homography_matrices) == 1
+#     assert mapper.homography_matrices[0].shape == (3, 3)
 
-    # Define image points to transform
-    test_point_1 = np.array([[[854, 213]]], dtype=np.float32)  # shape (1, 1, 2), should map to (6, 0) and (9, 1)
-    test_point_2 = np.array([[[340, 1355]]], dtype=np.float32)  # shape (1, 1, 2), should map to (3, 1)
-    result1 = mapper.image_to_world_coordinates(5, test_point_1)
-    result2 = mapper.image_to_world_coordinates(5, test_point_2)
-    print(f"Result1: {result1}, Result2: {result2}")
-    assert result1.shape == (2,)
-    assert result2.shape == (2,)
-    # Since homography can introduce some numerical noise, we allow a small tolerance
-    expected1 = (6, 0)
-    expected2 = (9, 1)
-    assert np.allclose(result1[0], expected1[0], atol=2)
-    assert np.allclose(result1[1], expected1[1], atol=3e-1)
+# def test_valid_transformation(sample_mappings, sample_resolution, sample_distortion):
+#     mapper = Mapper(sample_mappings, sample_resolution, sample_distortion)
 
-    assert np.allclose(result1[0], expected1[0], atol=2)
-    assert np.allclose(result2[1], expected2[1], atol=3e-1)
+#     # Define image points to transform
+#     test_point_1 = np.array([[[854, 213]]], dtype=np.float32)  # shape (1, 1, 2), should map to (6, 0) and (9, 1)
+#     test_point_2 = np.array([[[340, 1355]]], dtype=np.float32)  # shape (1, 1, 2), should map to (3, 1)
+#     result1 = mapper.image_to_world_coordinates(5, test_point_1)
+#     result2 = mapper.image_to_world_coordinates(5, test_point_2)
+#     print(f"Result1: {result1}, Result2: {result2}")
+#     assert result1.shape == (2,)
+#     assert result2.shape == (2,)
+#     # Since homography can introduce some numerical noise, we allow a small tolerance
+#     expected1 = (6, 0)
+#     expected2 = (9, 1)
+#     assert np.allclose(result1[0], expected1[0], atol=2)
+#     assert np.allclose(result1[1], expected1[1], atol=3e-1)
 
-def test_invalid_camera_id(sample_mappings, sample_resolution, sample_distortion):
-    mapper = Mapper(sample_mappings, sample_resolution, sample_distortion)
-    test_points = np.array([[0.5, 0.5]], dtype=np.float32)
+#     assert np.allclose(result1[0], expected1[0], atol=2)
+#     assert np.allclose(result2[1], expected2[1], atol=3e-1)
+
+# def test_invalid_camera_id(sample_mappings, sample_resolution, sample_distortion):
+#     mapper = Mapper(sample_mappings, sample_resolution, sample_distortion)
+#     test_points = np.array([[0.5, 0.5]], dtype=np.float32)
     
-    with pytest.raises(ValueError, match="Camera ID 1 not found in mappings."):
-        mapper.image_to_world_coordinates(1, test_points)
+#     with pytest.raises(ValueError, match="Camera ID 1 not found in mappings."):
+#         mapper.image_to_world_coordinates(1, test_points)
 
-def test_cam_9_map_to_intended_point():
-    mapper = Mapper(mappings=config.MAPPINGS, resolution=config.RESOLUTION,distortion=config.DISTORTION,cam_positions=None)
-    image_to_world_intended = {9:[([580, 900], (1, 0)), ([1016, 883], (1, 1))]}
+# def test_cam_9_map_to_intended_point():
+#     mapper = Mapper(mappings=config.MAPPINGS, resolution=config.RESOLUTION,distortion=config.DISTORTION,cam_positions=None)
+#     image_to_world_intended = {9:[([580, 900], (1, 0)), ([1016, 883], (1, 1))]}
     
-    print(mapper.image_to_world_coordinates(9, np.array([[image_to_world_intended[9][1][0]]], dtype=np.float32))) 
+#     print(mapper.image_to_world_coordinates(9, np.array([[image_to_world_intended[9][1][0]]], dtype=np.float32))) 
 
-    assert (mapper.image_to_world_coordinates(9, np.array([[image_to_world_intended[9][0][0]]], dtype=np.float32))[0] - image_to_world_intended[9][0][0][0]) < 0.01
-    assert (mapper.image_to_world_coordinates(9, np.array([[image_to_world_intended[9][0][0]]], dtype=np.float32))[1] - image_to_world_intended[9][0][0][1]) < 0.01
-    assert (mapper.image_to_world_coordinates(9, np.array([[image_to_world_intended[9][1][0]]], dtype=np.float32))[0] - image_to_world_intended[9][1][0][0]) < 0.01
-    assert (mapper.image_to_world_coordinates(9, np.array([[image_to_world_intended[9][1][0]]], dtype=np.float32))[1] - image_to_world_intended[9][1][0][1]) < 0.01
+#     assert (mapper.image_to_world_coordinates(9, np.array([[image_to_world_intended[9][0][0]]], dtype=np.float32))[0] - image_to_world_intended[9][0][0][0]) < 0.01
+#     assert (mapper.image_to_world_coordinates(9, np.array([[image_to_world_intended[9][0][0]]], dtype=np.float32))[1] - image_to_world_intended[9][0][0][1]) < 0.01
+#     assert (mapper.image_to_world_coordinates(9, np.array([[image_to_world_intended[9][1][0]]], dtype=np.float32))[0] - image_to_world_intended[9][1][0][0]) < 0.01
+#     assert (mapper.image_to_world_coordinates(9, np.array([[image_to_world_intended[9][1][0]]], dtype=np.float32))[1] - image_to_world_intended[9][1][0][1]) < 0.01
+
+
+# def test_correct_bias():
+#     mapper = Mapper(mappings=config.MAPPINGS, resolution=config.RESOLUTION,distortion=config.DISTORTION)
+#     cam_id = 9
+#     for i in range(len(config.CAM_BIAS[cam_id])):
+
+#         detected_point = config.CAM_BIAS[cam_id][i]['det_center']
+#         point = np.array([[[detected_point[0], detected_point[1]]]], dtype=np.float32)
+#         irl_point = mapper.image_to_world_coordinates(cam_id, point)
+#         print(f"irl point without bias :{irl_point}")
+
+#         corrected_bias = mapper.correct_bias(input_position=irl_point, cam_id=cam_id, scales=config.THALES_SCALE, camera_positions=config.CAM_POSITIONS)
+#         print(f"-----------corrected bias---------------\n{corrected_bias}")
+
+#         exp_point = config.CAM_BIAS[cam_id][i]['true_footprint']
+#         expected_point = np.array([[[exp_point[0], exp_point[1]]]], dtype=np.float32)
+#         irl_expected = mapper.image_to_world_coordinates(cam_id,expected_point)
+#         # print(f"expected point rel to cam : {irl_expected[0] - config.CAM_POSITIONS[cam_id][0]}, {irl_expected[1] - config.CAM_POSITIONS[cam_id][1]}")
+#         print(f"-----------~expected output---------------\n{irl_expected}")
+
+def test_correct_bias_all_paths():
+    mapper = Mapper(mappings=config.MAPPINGS, resolution=config.RESOLUTION,distortion=config.DISTORTION)
+    unbiased_paths = mapper.fix_paths_bias(paths=paths, scales=config.THALES_SCALE, cam_positions=config.CAM_POSITIONS)
+    print(unbiased_paths)

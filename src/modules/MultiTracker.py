@@ -250,6 +250,9 @@ class MultiTracker:
         # TODO: store coords of path of each cams to plot a bunch of graph : 2 per cams (cam coords and global coords, 2 self vars created in init) and then plot of global movements 
         # TODO: think about how to overlap batches for more accuracy
 
+        # TODO: extenslively test batch_match
+        # TODO: add biases to cam views
+        
         global_paths = []
 
         if self.batch_size == None:

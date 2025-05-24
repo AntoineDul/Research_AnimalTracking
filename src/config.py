@@ -23,6 +23,68 @@ FIRST_CAMERA = 5                                # First camera ID in the pen mon
 RESOLUTION = (2592, 1944)                       # Camera resolution from official datasheet
 DISTORTION = [-0.5, 0.1, 0, 0]                  # Distortion parameters used to undistort fisheye (found thorugh trial and error)
 CAM_FULLY_OVERLAPPED = [5, 6, 7]                # List of cameras whose views are fully included in another camera view (no possibility of detecting a pig ONLY from these cams)
+CAM_BIAS = {                                    # Bias (k1, k2) of cameras, with the format (x, y) = (k1 * x, k2 * y)
+    5: [
+        {"det_center": (377, 497), "true_footprint": (463, 523)},
+        {"det_center": (943, 244), "true_footprint": (977, 307)},
+        {"det_center": (1397, 984), "true_footprint": (1445, 1029)},
+        {"det_center": (988, 1398), "true_footprint": (999, 1368)},
+    ],
+    6: [
+        {"det_center": (1526, 1234), "true_footprint": (1382, 1216)},
+        {"det_center": (1868, 1710), "true_footprint": (1735, 1689)},
+        {"det_center": (2516, 1415), "true_footprint": (2303, 1432)},
+        {"det_center": (1609, 386), "true_footprint": (1514, 416)},
+        {"det_center": (1405, 1696), "true_footprint": (1357, 1578)},
+    ],
+    7: [
+        {"det_center": (1654, 1736), "true_footprint": (1626, 1686)},
+        {"det_center": (1943, 1017), "true_footprint": (1920, 1000)},
+        {"det_center": (1993, 311), "true_footprint": (1943, 395)},
+        {"det_center": (609, 885), "true_footprint": (630, 870)},
+        {"det_center": (521, 1812), "true_footprint": (564, 1736)},
+        {"det_center": (2041, 1690), "true_footprint": (1962, 1618)},
+    ],
+    8: [
+        {"det_center": (2024, 1358), "true_footprint": (2025, 1359)},
+        {"det_center": (634, 1025), "true_footprint": (712, 1100)},
+        {"det_center": (1260, 683), "true_footprint": (1322, 748)},
+        {"det_center": (911, 226), "true_footprint": (967, 353)},
+        {"det_center": (608, 252), "true_footprint": (686, 383)},
+        {"det_center": (536, 1476), "true_footprint": (630, 1492)},
+    ],
+    9: [
+        {"det_center": (2144, 1010), "true_footprint": (2144, 1012)},
+        {"det_center": (2133, 1512), "true_footprint": (2133, 1512)},
+        {"det_center": (2189, 434), "true_footprint": (2189, 438)},
+        {"det_center": (1058, 903), "true_footprint": (1144, 944)},
+        {"det_center": (460, 1408), "true_footprint": (557, 1423)},
+        {"det_center": (1323, 483), "true_footprint": (1401, 576)},
+        {"det_center": (802, 1475), "true_footprint": (922, 1514)},
+    ]
+}
+CAM_POSITIONS ={
+    5: (-0.1, 0.5),
+    6: (-0.1, -0.6),
+    7: (1, 0),
+    8: (0, -2.8),
+    9: (2.2, 2.5)
+    }
+# CAM_HEIGHTS = {5: 1.5,
+#                 6: 1.5,
+#                 7: 2.5,
+#                 8: 2.5,
+#                 9: 2.5}
+# PIG_AVG_HEIGHT = 0.55                           # Average height of the center of mass of a pig (in meters)
+THALES_SCALE = {                                  # Scale to undo bias of each cam (apply Thales theorem)
+    5: (0.94, 0.94),                
+    6: (0.83, 0.95),
+    7: (0.93, 0.93),
+    8: (0.93, 0.93),
+    9: (0.95, 0.9)
+    }
+
+               
 
 # Select detection model and tracking method
 DETECTION_METHOD = "YOLO"                       # Options: "YOLO", "ColorSegmentation"
@@ -83,23 +145,6 @@ MAPPINGS = {
             [[0, 0], [0.7, 0], [1.5, 0], [2.1, 0], [0.2, -1], [0.8, -1] ,[1.3, -1], [1.9, -1], [0.4, 1], [0.9, 1], [1.4, 1], [2, 1], [0.5, 2], [1, 2], [1.6, 2], [2.1, 2]], dtype=np.float32)
                     },
     }
-CAM_POSITIONS = {   # orientation : [yaw_deg, pitch_deg, roll_deg], location : [x, y, z] 
-    '5':{
-        'orientation': [], 'location': np.array([[-0.1], [0.6], [1]])
-    },
-    '6':{
-        'orientation': [], 'location': np.array([[-0.1], [-0.66], [1]])
-    },
-    '7':{
-        'orientation': [], 'location': np.array([[1.1], [0], [2]])
-    },
-    '8':{
-        'orientation': [], 'location': np.array([[0.5], [-2.6], [2]])
-    },
-    '9':{
-        'orientation': [], 'location': np.array([[1.5], [2.66], [1.8]])
-    },
-}
 
 # Clustering settings
 CLUSTER_EPSILON = 0.03                          # Epsilon for DBSCAN clustering -> size of the neighborhood around a point to be considered a cluster
@@ -108,8 +153,8 @@ MAX_GLOBAL_AGE = 10                             # Maximum age of a global track 
 MAX_CLUSTER_DISTANCE = 0.1                      # Maximum distance between two detections to be considered the same object
 
 # Batch analysis parameters
-FRECHET_THRESHOLD = 1                           #TODO
-BATCH_SIZE = 10                                 #TODO
+FRECHET_THRESHOLD = 1                            #TODO
+BATCH_SIZE = 100                                 #TODO
 
 
 """

@@ -29,7 +29,14 @@ def undistort(cam_id):
             print("saved")
 
 
+def undistort_all_screenshots():
+    mapper = Mapper(mappings=config.MAPPINGS, resolution=config.RESOLUTION, distortion=config.DISTORTION)
+    directory = "C:\\Users\\antoi\\OneDrive\\Documents\\UniMelb\\COMP30013\\PigMonitor\\outputs\\screenshots"
+    for file in os.listdir(directory):
+        if file.endswith('.jpg'):
+            full_file = f"C:\\Users\\antoi\\OneDrive\\Documents\\UniMelb\\COMP30013\\PigMonitor\\outputs\\screenshots\\{file}"
+            undistorted_image = mapper.undistort_images(full_file)
+            cv2.imwrite(f"outputs/undistorted_cameras/undistorted_{file}", undistorted_image)
 
 if __name__ == "__main__":
-    for i in [5,6,7,8,17]:
-        undistort(i)
+    undistort_all_screenshots()
