@@ -137,3 +137,7 @@ class GreedyTracker(BaseTracker):
     
     def get_tracks(self):
         return self.tracked
+
+    def reinitialize_id_count(self):
+        self.next_id = 1
+        return

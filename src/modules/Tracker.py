@@ -39,3 +39,6 @@ class Tracker:
         """
 
         return self.tracker.get_tracks()
+
+    def reinitialize_id_count(self):
+        self.tracker.reinitialize_id_count()

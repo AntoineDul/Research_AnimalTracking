@@ -1,14 +1,29 @@
 import src.modules as modules
 import src.config as config
+import numpy as np
 import cv2
 import os
+from datetime import datetime
 
 class PigMonitor:
     
     def __init__(self):
         self.detector = modules.Detector()
         self.mapper = modules.Mapper(config.MAPPINGS, config.RESOLUTION, config.DISTORTION)
-        self.multi_tracker = modules.MultiTracker(config.NUM_CAMERAS, config.FIRST_CAMERA, self.mapper, config.CLUSTER_EPSILON, config.CLUSTER_MIN_SAMPLES, config.MAX_GLOBAL_AGE, config.MAX_CLUSTER_DISTANCE, False)
+        self.multi_tracker = modules.MultiTracker(num_cameras=config.NUM_CAMERAS, 
+                                                  first_camera=config.FIRST_CAMERA, 
+                                                  mapper=self.mapper, 
+                                                  cluster_eps=config.CLUSTER_EPSILON, 
+                                                  cluster_min_samples=config.CLUSTER_MIN_SAMPLES, 
+                                                  max_age=config.MAX_GLOBAL_AGE,
+                                                  max_cluster_distance= config.MAX_CLUSTER_DISTANCE, 
+                                                  frechet_threshold=config.FRECHET_THRESHOLD,
+                                                  similarity_threshold=config.SIMILARITY_THRESHOLD,
+                                                  batch_size=config.BATCH_SIZE,
+                                                  overlapped_cams=config.CAM_FULLY_OVERLAPPED,
+                                                  non_overlap_threshold=config.NON_OVERLAP_ZONES,
+                                                  print_tracked=False,
+                                                  )
         self.drawer = modules.Drawer()
         self.file_directory = config.MEDIAFLUX_VIDEO_DIR
         self.sync = modules.Synchronizer(self.file_directory)
@@ -226,21 +241,31 @@ class PigMonitor:
         self.multi_tracker.global_batches_tracks = [[] for _ in range(config.NUM_PIGS + 10)]
 
         video_caps, out = self.set_up_monitoring()
+        with open(f"{config.OUTPUT_DIR}\\paths_merging.txt", "w") as f:
+            f.write("Beginning of merge analysis.\n\n")
 
         batch_count = 0
         frame_count = 0
 
-        a = True
+        monitor = True
         
-        while a:
-            paths = {}
+        while monitor:
 
+            # Initialize individual cams paths tracking 
+            paths = {}
+            
             for i in range(config.NUM_CAMERAS):
-                paths[i + self.first_camera] = [[] for _ in range(config.NUM_PIGS)]
+                paths[i + self.first_camera] = [[] for _ in range(config.NUM_PIGS + 10)]  # + 10 to leave room for wrong re-ids during batch, they are handled later
+
+            # Set all id tracking to 1 => to avoid getting huge id numbers after a great nb of batches due to individual cam re-ids
+            self.multi_tracker.reinitialize_trackers_id_count()
+
+            # Clear unmatched paths from previous batch
+            self.multi_tracker.orphan_paths = []
 
             all_successful = True
-
             frame_count += 1
+
             # Skip frames to improve performance (process every 2nd frame)
             if frame_count % config.FRAME_SKIP != 0 and frame_count > 1:
                 continue
@@ -258,9 +283,6 @@ class PigMonitor:
                     # Process frames
                     tracks = self.process_batch_frame(frame, frame_count, cam_id)
 
-                    # print(f"\ntracks for cam {cam_id}: {tracks}\n")
-                    # print(f"iteration tracks: {tracks}")
-
                     for track in tracks:
                         paths[cam_id][track['id']].append((track['center'], batch_frame_number))
 
@@ -268,11 +290,21 @@ class PigMonitor:
                 if not all_successful:
                     break
             
-            print(f"PATHS: {paths}")
-
             # Correct bias and handle outliers in the detected paths 
             unbiased_paths = self.mapper.fix_paths_bias(paths, config.THALES_SCALE, config.CAM_POSITIONS)
-            clean_paths = self.multi_tracker.handle_outliers(config.MAX_PIG_MVMT_BETWEEN_TWO_FRAMES, unbiased_paths) 
+
+            # Relocate the outliers in the paths in their correct path or discard them if they were noise
+            rebuilt_paths = self.multi_tracker.handle_outliers(config.MAX_PIG_MVMT_BETWEEN_TWO_FRAMES, unbiased_paths) 
+
+            # Merge pieces of the same paths that were separated and discard the paths that are too short 
+            clean_paths = {cam_id: self.multi_tracker.merge_incomplete_paths(paths_list, config.BATCH_SIZE, config.MAX_PIG_MVMT_BETWEEN_TWO_FRAMES) for cam_id, paths_list in rebuilt_paths.items()}
+
+            # --- Debugging ---
+            # for cam_id in [5, 6, 7, 8, 9]:
+            #     print(f"========== cam {cam_id} ===========")
+            #     for i, path in enumerate(clean_paths[cam_id]):
+            #         print(f"path {i} (length {len(path)}): {path}")
+            #     print("=====================================")
 
             # Merge paths together sequentially
             paths_7_17 = self.multi_tracker.batch_match(clean_paths[7], clean_paths[9], 7, 17)  # Match batch paths across cameras
@@ -280,45 +312,51 @@ class PigMonitor:
             paths_5_7_8_17 = self.multi_tracker.batch_match(clean_paths[5], paths_8_7_17, 5, None)
             all_paths_merged = self.multi_tracker.batch_match(clean_paths[6], paths_5_7_8_17, 6, None)
 
-            print(f"\n\nALL PATHS MERGED:")
-            print(all_paths_merged)
-            # print(f"global batches tracks: \n{self.multi_tracker.global_batches_tracks}")
+            # Concatenate or discard pieces of paths together 
+            # fused_paths = self.multi_tracker.merge_incomplete_paths(all_paths_merged, config.BATCH_SIZE)
+
+            # Last check for duplicate paths
+            final_paths_merged = self.multi_tracker.remove_duplicate_paths(all_paths_merged)
             
             # need to make sure this extends right path
-            # TODO inaccuracies here 
-            for idx, path in enumerate(all_paths_merged):
-                if idx == 0: continue
-                if batch_count == 0:
+            if batch_count == 0:
+                for idx, path in enumerate(final_paths_merged):
+                    # if idx == 0 : continue
                     self.multi_tracker.global_batches_tracks[idx].extend(path)
-                else:
-                    placed = False
-                    dist_to_closest_endpoint = 1000
-                    best_path_idx = None
-                    possible_indices = [i for i in range(len(self.multi_tracker.global_batches_tracks))]
-                    for track_idx in possible_indices:
-                        if len(self.multi_tracker.global_batches_tracks[track_idx]) > 0:
-                            distance = self.multi_tracker.euclidean_distance(path[0][0], self.multi_tracker.global_batches_tracks[track_idx][-1][0])
-                            if distance < dist_to_closest_endpoint:
-                                dist_to_closest_endpoint = distance
-                                best_path_idx = track_idx
-                    possible_indices.remove(best_path_idx)
-                    self.multi_tracker.global_batches_tracks[best_path_idx].extend(path)
-                    placed = True
-                    
-                    if placed == False:
-                        raise ValueError
+            else:
+                self.multi_tracker.extend_global_paths(merged_paths=final_paths_merged, output_dir=config.OUTPUT_DIR, overlap_frames=config.REWIND_FRAMES)                
 
-            
-        
+            # Rewind a number of frames to overlap with next batch
+            for cam_id, cap in video_caps.items():
+                current_pos = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
+                cap.set(cv2.CAP_PROP_POS_FRAMES, max(0, current_pos - config.REWIND_FRAMES))
+
+            # Increment batch count
             batch_count += 1
-            if batch_count == 1:
-                for i in [5, 6, 7, 8, 9]:
-                    self.drawer.plot_batch_paths(clean_paths[i], i, config.BATCH_SIZE, config.BATCH_PLOTS_PATH) 
-                a=False
+        
+            # Plot the paths detected in the batch for each pov
+            for i in [5, 6, 7, 8, 9]:
+                self.drawer.plot_batch_paths(clean_paths[i], i, config.BATCH_SIZE, config.BATCH_PLOTS_PATH, batch_count) 
 
-        self.drawer.plot_batch_paths(self.multi_tracker.global_batches_tracks, "overall", config.BATCH_SIZE, config.BATCH_PLOTS_PATH)
-        # self.multi_tracker.save_tracking_history(self.tracking_history_path)
-        # self.drawer.plot_logs(self.tracking_history_path, self.output_plot_path)
+            # Plot overall paths so far 
+            self.drawer.plot_batch_paths(self.multi_tracker.global_batches_tracks, "overall", config.BATCH_SIZE, config.BATCH_PLOTS_PATH, batch_count)
+            
+            print(f"\n\n======================= batch {batch_count} complete. ===================================\n\n")
+            with open(f"{config.OUTPUT_DIR}\\paths_merging.txt", "a") as f:
+                f.write(f"\n\n======================= batch {batch_count} complete. ===================================\n\n")
+            
+            # Debugging
+            if batch_count == 12:
+                monitor=False
+                
+        # --- Debugging ---
+        # for i, path in enumerate(self.multi_tracker.global_batches_tracks):
+        #     print(f"\n\npath {i} (length {len(path)}): {path}\n\n")
+
+        # Save tracking history to json file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = f"{config.OUTPUT_DIR}\\track_history\\{timestamp}_track_{config.BATCH_SIZE}_batch-size_{batch_count}_batches.json"
+        self.multi_tracker.save_tracking_history(file_path=save_path)
 
         # Cleanup
         for cap in video_caps.values():

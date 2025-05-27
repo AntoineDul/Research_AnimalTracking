@@ -43,17 +43,22 @@ def get_screenshot(video_path, cam_id, frame_number, offset_from_base):
 
 if __name__ == "__main__":
 
-    video_path_D5 = "C:\\Users\\antoi\\Documents\\Unimelb_Mediaflux\\2024-10-16~08\\D5_S20241016075913_E20241016080735.mp4"
-    video_path_D6 = "C:\\Users\\antoi\\Documents\\Unimelb_Mediaflux\\2024-10-16~08\\D6_S20241016080005_E20241016080827.mp4"
-    video_path_D7 = "C:\\Users\\antoi\\Documents\\Unimelb_Mediaflux\\2024-10-16~08\\D7_S20241016080133_E20241016080955.mp4"
-    video_path_D8 = "C:\\Users\\antoi\\Documents\\Unimelb_Mediaflux\\2024-10-16~08\\D8_S20241016080024_E20241016080846.mp4"
-    video_path_D17 = "C:\\Users\\antoi\\Documents\\Unimelb_Mediaflux\\2024-10-16~08\\D17_S20241016080531_E20241016081353.mp4"
-    video_paths = [video_path_D5, video_path_D6, video_path_D7, video_path_D8, video_path_D17]
+    # video_path_D5 = "C:\\Users\\antoi\\Documents\\Unimelb_Mediaflux\\2024-10-16~08\\D5_S20241016075913_E20241016080735.mp4"
+    # video_path_D6 = "C:\\Users\\antoi\\Documents\\Unimelb_Mediaflux\\2024-10-16~08\\D6_S20241016080005_E20241016080827.mp4"
+    # video_path_D7 = "C:\\Users\\antoi\\Documents\\Unimelb_Mediaflux\\2024-10-16~08\\D7_S20241016080133_E20241016080955.mp4"
+    # video_path_D8 = "C:\\Users\\antoi\\Documents\\Unimelb_Mediaflux\\2024-10-16~08\\D8_S20241016080024_E20241016080846.mp4"
+    # video_path_D17 = "C:\\Users\\antoi\\Documents\\Unimelb_Mediaflux\\2024-10-16~08\\D17_S20241016080531_E20241016081353.mp4"
+    # video_paths = [video_path_D5, video_path_D6, video_path_D7, video_path_D8, video_path_D17]
+    video_paths = ["C:\\Users\\antoi\\OneDrive\\Documents\\UniMelb\\COMP30013\\PigMonitor\\data\\farm_videos\\D3_S20240731144859_E20240731145721.mp4"]
 
     # frame_numbers = [1200, 1040, 0, 1200, 1400]  
-    base_frame_numbers = [2800, 1760, 0, 1380, 5280]
-    offsets = [int(x * 20) for x in [0, 25, 40, 72, 107.5]]
-    cam_ids = [5, 6, 7, 8, 17]
+    # base_frame_numbers = [2800, 1760, 0, 1380, 5280]
+    # offsets = [int(x * 20) for x in [0, 25, 40, 72, 107.5]]
+    # cam_ids = [5, 6, 7, 8, 17]
+    
+    base_frame_numbers = [0]
+    offsets = [0]
+    cam_ids = [3]
     for offset in offsets: 
         for i in range(len(video_paths)):
             get_screenshot(video_paths[i], cam_ids[i], base_frame_numbers[i] + offset, offset)

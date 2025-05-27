@@ -17,13 +17,14 @@ YOLO_MODEL_PATH = os.path.join(MODEL_DIR, "yolov11_pig_v2.pt")
 RFID_PATH = os.path.join(DATA_DIR, "RFID", "21-056 Drinker Raw Data 26Jun2024-18Sep2024.xlsx")
 
 # Farm settings
-NUM_PIGS = 20    #15                            # Total number of pigs in the pen
+NUM_PIGS = 15                                   # Total number of pigs in the pen
 NUM_CAMERAS = 5                                 # Number of cameras in the pen monitored
 FIRST_CAMERA = 5                                # First camera ID in the pen monitored (pen 2)
 RESOLUTION = (2592, 1944)                       # Camera resolution from official datasheet
 DISTORTION = [-0.5, 0.1, 0, 0]                  # Distortion parameters used to undistort fisheye (found thorugh trial and error)
 CAM_FULLY_OVERLAPPED = [5, 6, 7]                # List of cameras whose views are fully included in another camera view (no possibility of detecting a pig ONLY from these cams)
-CAM_BIAS = {                                    # Bias (k1, k2) of cameras, with the format (x, y) = (k1 * x, k2 * y)
+NON_OVERLAP_ZONES = [-1.5, 1]                    # Define the zones that can only be seen by one camera
+CAM_BIAS = {                                    # For testing purposes
     5: [
         {"det_center": (377, 497), "true_footprint": (463, 523)},
         {"det_center": (943, 244), "true_footprint": (977, 307)},
@@ -70,12 +71,6 @@ CAM_POSITIONS ={
     8: (0, -2.8),
     9: (2.2, 2.5)
     }
-# CAM_HEIGHTS = {5: 1.5,
-#                 6: 1.5,
-#                 7: 2.5,
-#                 8: 2.5,
-#                 9: 2.5}
-# PIG_AVG_HEIGHT = 0.55                           # Average height of the center of mass of a pig (in meters)
 THALES_SCALE = {                                  # Scale to undo bias of each cam (apply Thales theorem)
     5: (0.94, 0.94),                
     6: (0.83, 0.95),
@@ -83,8 +78,6 @@ THALES_SCALE = {                                  # Scale to undo bias of each c
     8: (0.93, 0.93),
     9: (0.95, 0.9)
     }
-
-               
 
 # Select detection model and tracking method
 DETECTION_METHOD = "YOLO"                       # Options: "YOLO", "ColorSegmentation"
@@ -106,6 +99,7 @@ MAX_PIG_MVMT_BETWEEN_TWO_FRAMES = 0.1          # max distance between two points
 
 # Video processing settings
 FRAME_SKIP = 2                                  # Number of frames to skip for processing
+REWIND_FRAMES = 20                              # Number of frames to rewind to overlap batches
 
 # Output settings
 OUTPUT_VIDEO_WIDTH = 1600                       # Width of output video
@@ -153,8 +147,9 @@ MAX_GLOBAL_AGE = 10                             # Maximum age of a global track 
 MAX_CLUSTER_DISTANCE = 0.1                      # Maximum distance between two detections to be considered the same object
 
 # Batch analysis parameters
-FRECHET_THRESHOLD = 1                            #TODO
-BATCH_SIZE = 100                                 #TODO
+FRECHET_THRESHOLD = 0.4                         #TODO
+SIMILARITY_THRESHOLD = 0.05 
+BATCH_SIZE = 100                                #TODO
 
 
 """
