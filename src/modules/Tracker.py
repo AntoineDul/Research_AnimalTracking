@@ -1,6 +1,5 @@
 from src import config
 from .trackers.GreedyTracker import GreedyTracker
-from .trackers.DeepSortTracker import DeepSortTracker
 
 class Tracker:
         
@@ -10,8 +9,6 @@ class Tracker:
     def load_tracker(self):
         if config.TRACKING_METHOD == "GREEDY":
             return GreedyTracker(config.IOU_THRESHOLD, config.MAX_TRACK_AGE, config.MAX_DISTANCE, config.ALPHA)
-        elif config.TRACKING_METHOD == "DEEP_SORT":
-            return DeepSortTracker()
         else:
             raise ValueError(f"Unknown model: {config.DETECTION_METHOD}")
 

@@ -1,6 +1,5 @@
 import numpy as np
 import cv2
-import pickle
 
 class Mapper:
 
@@ -11,22 +10,25 @@ class Mapper:
                 [0, self.w, self.h / 2],
                 [0, 0, 1]
             ], dtype=np.float64)
-        self.d = np.array(distortion, dtype=np.float64) # [k1, k2, p1, p2] where k1, k2 -> adial distortion and p1, p2 -> angential distortion
+        self.d = np.array(distortion, dtype=np.float64) # [k1, k2, p1, p2] where k1, k2 -> radial distortion and p1, p2 -> tangential distortion
         self.cameras = list(int(cam_id) for cam_id in mappings.keys())
         self.homography_matrices = [
             cv2.findHomography(mapping['image_points'], mapping['world_points'])[0] for mapping in mappings.values()
         ]
 
     def image_to_world_coordinates(self, cam_id, image_points):
+        """Translate a single point from cam relative coordinates to pen coordinates"""
         if cam_id not in self.cameras:
             raise ValueError(f"Camera ID {cam_id} not found in mappings: {self.cameras}.")
 
         homography_matrix = self.homography_matrices[cam_id % self.cameras[0]]
         world_points = cv2.perspectiveTransform(image_points, homography_matrix)[0][0]
-        # print("World Points: ", world_points)
         return world_points
 
-    def batch_to_world_coords(self, paths_list, cam_id): # paths_list = [ [((x1, y1), f1), ((x2, y2), f2), ...], ... ]
+    def batch_to_world_coords(self, paths_list, cam_id): 
+        """Translate every point from a path from cam relative coordinates to pen coordinates
+        paths_list format: [ [((x1, y1), f1), ((x2, y2), f2), ...], ... ] where f is frame number
+        """
         transformed_paths = []
         for path in paths_list:
             transformed_path = []
@@ -38,12 +40,9 @@ class Mapper:
                 transformed_path.append(global_data)
             transformed_paths.append(transformed_path)
         return transformed_paths
-
-    def world_to_image_coordinates(self):
-        # For backtracking 
-        pass
     
     def undistort_images(self, image):
+        """Remove the fisheye effect from the input frame (image)"""
         try:
             image.shape
         except AttributeError:
@@ -52,38 +51,8 @@ class Mapper:
         return cv2.fisheye.undistortImage(image, self.k, self.d, Knew=self.k)
 
     @staticmethod
-    def get_rotation_matrix(yaw_deg=0, pitch_deg=-30, roll_deg=0):
-        yaw = np.radians(yaw_deg)
-        pitch = np.radians(pitch_deg)
-        roll = np.radians(roll_deg)
-
-        Rx = np.array([
-            [1, 0, 0],
-            [0, np.cos(pitch), -np.sin(pitch)],
-            [0, np.sin(pitch),  np.cos(pitch)]
-        ])
-        Ry = np.array([
-            [np.cos(yaw), 0, np.sin(yaw)],
-            [0, 1, 0],
-            [-np.sin(yaw), 0, np.cos(yaw)]
-        ])
-        Rz = np.array([
-            [np.cos(roll), -np.sin(roll), 0],
-            [np.sin(roll),  np.cos(roll), 0],
-            [0, 0, 1]
-        ])
-        return Rz @ Ry @ Rx
-    
-    def load_model(self, cam_id, models_dir):
-        path = f"{models_dir}/cam_{cam_id}_bias_model.pkl"
-        with open(path, "rb") as f:
-            models = pickle.load(f)
-            model_dx = models["dx"]
-            model_dy = models["dy"]
-        return model_dx, model_dy
-
-    @staticmethod
     def correct_bias(input_position:tuple, cam_id:int, scales:dict, camera_positions:dict):
+        """Correct the bias of a single input point"""
 
         # Camera position
         cam_pos = camera_positions[cam_id]
@@ -122,6 +91,7 @@ class Mapper:
             return (unbiased_x, unbiased_y)
 
     def fix_paths_bias(self, paths:dict, scales:dict, cam_positions:dict):
+        """Correct the bias for each points of the dictionary of lists of paths input"""
         unbiased_paths = {}
 
         for cam_id, batch in paths.items():
@@ -138,9 +108,7 @@ class Mapper:
                 for point in path:
                     if len(point) == 0: 
                         continue
-                    # print(point)
-                    unbiased_point = self.correct_bias(point[0], cam_id, scales, cam_positions)
-                    # print(f"unbiased point : {unbiased_point}")
+                    unbiased_point = self.correct_bias(input_position=point[0], cam_id=cam_id, scales=scales, camera_positions=cam_positions)
                     assert(isinstance(point, tuple))
 
                     new_path.append((unbiased_point, point[1]))

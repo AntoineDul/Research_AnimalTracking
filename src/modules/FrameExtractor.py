@@ -1,6 +1,6 @@
 import cv2
 
-# This is a helper class to extract frames from a video file in order to analyze them separately. 
+# This is a helper file to extract frames from a video file in order to analyze them separately. 
 # It was origianly created to get the frames from each camera to find the pixels to match with real world coordinates to compute the homography matrix.
 
 def get_screenshot(video_path, cam_id, frame_number, offset_from_base):

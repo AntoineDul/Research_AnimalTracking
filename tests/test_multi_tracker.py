@@ -28,81 +28,88 @@ dummy_batch_path_cam9 = [[],
                             [], [], [], [], [], [], []
                             ]
 
-def test_initialize_multi_tracker():
-    multi_tracker = MultiTracker(num_cameras=5, first_camera=5, mapper=Mapper(config.MAPPINGS, config.RESOLUTION, config.DISTORTION), cluster_eps=0.5, cluster_min_samples=2, max_age=5, max_cluster_distance=5, print_tracked=True)
+problematic_path = [((0.6615990918874741, -2.352366014480591), 0), ((0.6610309660434723, -2.3498050413131715), 1), ((0.6603707671165466, -2.351613465309143), 2), ((0.6761776810884476, -2.341339195728302), 3), ((0.6765509068965913, -2.3430540499687194), 4), ((1.9887947773933412, -1.2312837133407593), 5), ((1.9890207195281984, -1.2285109887123107), 6), ((1.774707065820694, 0.6018224653005602), 7), ((1.9890207195281984, -1.2285109887123107), 8), ((1.778378791809082, 0.60241099023819), 9), ((1.9891338014602662, -1.2271235177516937), 10), ((1.9904981017112733, -1.226961101055145), 11), ((1.9891338014602662, -1.2271235177516937), 12), ((1.9891338014602662, -1.2271235177516937), 13), ((1.9891338014602662, -1.2271235177516937), 14), ((1.9891338014602662, -1.2271235177516937), 15), ((1.9891338014602662, -1.2271235177516937), 16), ((1.9891338014602662, -1.2271235177516937), 17), ((1.988907859325409, -1.2298976836204527), 18), ((1.988907859325409, -1.2298976836204527), 19), ((1.9891338014602662, -1.2271235177516937), 20), ((1.9893601870536806, -1.2243464694023132), 21), ((1.9879952216148378, -1.2245089969635008), 22), ((2.04159893989563, -1.3588436803817747), 23), ((1.9884473276138306, -1.2189461419582366), 24), ((1.9884473276138306, -1.2189461419582366), 25), ((1.9884473276138306, -1.2189461419582366), 26), ((1.9884473276138306, -1.2189461419582366), 27), ((1.9885604095458986, -1.2175535712242125), 28), ((1.9886734914779665, -1.2161602244377134), 29), ((1.9900406742095949, -1.2159971425533294), 30), ((1.9883342456817628, -1.2203379366397857), 31), ((1.767584345340729, 0.6082607629299166), 32), ((1.988456418514252, -1.2354372570514678), 33), ((1.9882309198379517, -1.2382025537490844), 34), ((1.7677305757999422, 0.6133466228246691), 35), ((1.7677305757999422, 0.6133466228246691), 36), ((1.7677305757999422, 0.6133466228246691), 37), ((1.769421594142914, 0.6085555520057682), 38), ((1.769421594142914, 0.6085555520057682), 39), ((1.771258842945099, 0.6088503410816193), 40), ((1.771407734155655, 0.6139370324611666), 41), ((1.77324653506279, 0.6142322649955752), 42), ((1.771407734155655, 0.6139370324611666), 43), ((1.7715567362308504, 0.619031096339226), 44), ((1.7715567362308504, 0.619031096339226), 45), ((1.7695690441131593, 0.613641799926758), 46), ((1.9894734907150269, -1.2229567811489104), 47), ((1.769421594142914, 0.6085555520057682), 48), ((1.9894734907150269, -1.2229567811489104), 49), ((1.767511396408081, 0.6057205768823626), 50), ((1.7677305757999422, 0.6133466228246691), 51), ((1.7695690441131593, 0.613641799926758), 52), ((1.767584345340729, 0.6082607629299166), 53), ((1.7695690441131593, 0.613641799926758), 54), ((1.769421594142914, 0.6085555520057682), 55), ((1.771407734155655, 0.6139370324611666), 56), ((1.7730963134765625, 0.6091451855897905), 57), ((1.7693478691577913, 0.6060151442289357), 58), ((1.771258842945099, 0.6088503410816193), 59), ((1.769421594142914, 0.6085555520057682), 60), ((1.7673654985427858, 0.6006457480192187), 61), ((1.7692006409168244, 0.6009399273395539), 62), ((1.7673654985427858, 0.6006457480192187), 63), ((1.7692006409168244, 0.6009399273395539), 64), ((1.7673654985427858, 0.6006457480192187), 65), ((0.8100519436597825, -2.083450306415558), 66), ((0.81079063475132, -2.061558309555054), 67), ((0.8098333740234376, -2.029531732559204), 68), ((0.8151803201436997, -2.0340268502235412), 69), ((1.7673654985427858, 0.6006457480192187), 70), ((1.7693478691577913, 0.6060151442289357), 71), ((1.7654582941532135, 0.597817147612572), 72), ((2.0886596488952636, -0.04659599891304955), 73), ((1.75628879070282, 0.596347969412804), 74), ((1.761860958337784, 0.5997634317874909), 75), ((1.761860958337784, 0.5997634317874909), 76), ((1.761860958337784, 0.5997634317874909), 77), ((1.9922681665420534, -0.025339228719472917), 78), ((1.9740672969818116, -0.023822475731372528), 79), ((1.9687641978263857, -0.028762257605790875), 80), ((1.9518637704849244, -0.03330425715446461), 81), ((1.9436085677146913, -0.03242584890127187), 82), ((1.9285287594795228, -0.034622035831212816), 83), ((1.9158225631713868, -0.023969925701618156), 84), ((1.9116715693473816, -0.03915590068697927), 85), ((1.9008420896530152, -0.024067971616983375), 86), ((1.8843950986862184, -0.020199169874191014), 87), ((1.8907489728927613, -0.058776378095149795), 88), ((1.9488484740257264, -1.331581954717636), 89), ((1.8890815687179567, -0.059018492609262285), 90), ((1.8854336786270143, -0.06574074229598015), 91), ((1.8805412220954896, -0.06438795810937847), 92), ((1.7361290538311005, 0.5931177618503574), 93), ((1.8687869095802307, -0.06815594232082356), 94), ((1.7396675205230714, 0.5886472561359408), 95), ((1.752487131357193, 0.5906999149322512), 96), ((1.7544554221630098, 0.5960541781187061), 97), ((1.770961836576462, 0.5986989649534227), 98), ((1.770961836576462, 0.5986989649534227), 99), ((1.7765428733825686, 0.6021167554855347), 100), ((1.7969685745239259, -0.08884964486956592), 101), ((1.783723908662796, -0.09076823367178433), 102), ((1.7754499697685242, -0.09196677742898451), 103), ((1.7572579693794252, -0.09460202990472322), 104), ((1.750646334886551, -0.0955597756654023), 105), ((1.7340161955356599, -0.10206328248977625), 106), ((0.8475687593221665, -1.8618361053466796), 107), ((0.8310215467214584, -1.8917439482212066), 108), ((1.714268764257431, -0.10287635682523222), 109), ((1.7077181053161623, -0.10177824950218195), 110), ((0.8144112521409989, -1.8697561643123626), 111), ((1.2075625956058502, -1.8009931478500365), 112), ((1.6998213279247285, -0.08650347886979581), 113), ((0.8107378631830215, -1.869065366744995), 114), ((0.8031145888566972, -1.873142413854599), 115), ((0.8238627398014069, -1.8622123799324035), 116), ((0.8247313088178635, -1.8675589380264281), 117), ((1.8266370606422426, 0.6228049840927126), 118), ((1.8229509222507478, 0.6222131332159044), 119), ((1.8190816354751589, 0.6165236707925796), 120), ((1.8100540387630464, 0.6201422926187519), 121), ((1.8080366349220276, 0.614751444101334), 122), ((0.8093213456869126, -1.860510496854782), 123), ((0.800518360733986, -1.8647284529209136), 124), ((1.8043561506271364, 0.6141609236001973), 125), ((1.8043561506271364, 0.6141609236001973), 126), ((1.8006762206554414, 0.6135704585313797), 127), ((1.8006762206554414, 0.6135704585313797), 128), ((1.668869916200638, -0.06415386742353402), 129), ((1.0525948941707612, -2.069405530452728), 130), ((1.0419002258777619, -2.1028292236328125), 131), ((1.027931946516037, -2.108136092185974), 132), ((0.7800816285610199, -1.8701934144496917), 133), ((1.0117734253406525, -2.131013453960419), 134), ((0.9963284289836885, -2.1325770888328552), 135), ((0.9753762316703797, -2.1183225569725037), 136), ((1.528951313495636, -2.1066491756439207), 137), ((1.5211848020553589, -2.1160445103645324), 138), ((1.520489126443863, -2.048198233604431), 139), ((1.8061962819099426, 0.6144561561346058), 140), ((0.730107729434967, -1.9079077908992765), 141), ((1.4900560069084168, -2.1305946073532103), 142), ((1.8080366349220276, 0.614751444101334), 143), ((1.5347916626930238, -0.6692242161035535), 144), ((1.5259694981575014, -0.6924505797624585), 145), ((1.52153990149498, -0.6981016275882719), 146), ((1.5111264967918396, -0.699477513194084), 147), ((1.5037456834316254, -0.7055069974660872), 148), ((1.500736927986145, -0.7025358805656432), 149), ((0.8010034489631653, -2.3432099256515504), 150), ((1.8227645587921144, 0.6171145793199542), 151), ((1.8229509222507478, 0.6222131332159044), 152), ((1.8227645587921144, 0.6171145793199542), 153), ((1.8227645587921144, 0.6171145793199542), 154), ((1.8246062421798708, 0.6174100890159608), 155), ((1.8190816354751589, 0.6165236707925796), 156), ((0.6647732573747636, -1.8509634993076323), 157), ((0.6566082429885864, -1.8518488643169402), 158), ((0.6678395515680313, -1.860501073360443), 159), ((0.6888092654943466, -1.876768574476242), 160), ((1.8266370606422426, 0.6228049840927126), 161), ((0.6661441540718079, -1.863964928150177), 162), ((1.830323864221573, 0.6233969458341599), 163), ((0.6705882740020752, -1.862391315460205), 164), ((0.6656137222051621, -1.8672979626655577), 165), ((0.6713118320703507, -1.8721319935321807), 166), ((0.6737527942657471, -1.8664184734821319), 167), ((0.6758703088760376, -1.8650980756282807), 168), ((1.8321674323081971, 0.6236929544210437), 169), ((1.8321674323081971, 0.6236929544210437), 170), ((1.8340112221240998, 0.6239890184402466), 171), ((0.6638186573982239, -1.852165715456009), 172), ((0.6695375543832779, -1.8570318970680235), 173), ((1.8321674323081971, 0.6236929544210437), 174), ((1.8321674323081971, 0.6236929544210437), 175), ((1.8340112221240998, 0.6239890184402466), 176), ((1.8321674323081971, 0.6236929544210437), 177), ((1.8321674323081971, 0.6236929544210437), 178), ((1.8321674323081971, 0.6236929544210437), 179), ((0.6661514157056809, -1.851912833213806), 180), ((0.21555346250534058, -1.591116740465164), 181), ((0.6674180996418, -1.858357062101364), 182), ((0.7474905288219452, -2.3361598215103148), 183), ((0.6688077878952027, -1.8472265849113465), 184), ((0.6647695988416672, -1.863020583152771), 185), ((0.6661441540718079, -1.863964928150177), 186), ((0.7469492322206498, -2.344086643218994), 187), ((0.6666753065586091, -1.8606270155906677), 188), ((1.6719423079490663, -0.07818976035714131), 189), ((1.6722558331489563, -0.05950969225168201), 190), ((0.754283537864685, -2.417130475997925), 191), ((1.6676128220558168, -0.03935566490888576), 192), ((1.669277232885361, -0.0391120260059834), 193), ((1.6737734591960909, -0.06758400550484644), 194), ((1.6737027275562286, -0.0717340846955774), 195), ((1.673596740961075, -0.07794904550909987), 196), ((1.6718382060527803, -0.08439211724698525), 197), ((1.670459271669388, -0.06806697344779966), 198), ((1.668432333469391, -0.09106190024316296), 199)]
 
-    multi_tracker.track(dummy_detection_cam8, 8)  # Camera 8
-    multi_tracker.track(dummy_detection_cam9, 9)  # Camera 9
-    multi_tracker.track(dummy_detection_cam6, 6)  # Camera 6
+# def test_initialize_multi_tracker():
+#     multi_tracker = MultiTracker(num_cameras=5, first_camera=5, mapper=Mapper(config.MAPPINGS, config.RESOLUTION, config.DISTORTION), cluster_eps=0.5, cluster_min_samples=2, max_age=5, max_cluster_distance=5, print_tracked=True)
 
-    assert len(multi_tracker.global_detections) == 4
+#     multi_tracker.track(dummy_detection_cam8, 8)  # Camera 8
+#     multi_tracker.track(dummy_detection_cam9, 9)  # Camera 9
+#     multi_tracker.track(dummy_detection_cam6, 6)  # Camera 6
 
-def test_first_global_track():
-    multi_tracker = MultiTracker(num_cameras=5, first_camera=5, mapper=Mapper(config.MAPPINGS, config.RESOLUTION, config.DISTORTION), cluster_eps=0.5, cluster_min_samples=2, max_age=5, max_cluster_distance=5, print_tracked=True)
+#     assert len(multi_tracker.global_detections) == 4
 
-    multi_tracker.track(dummy_detection_cam8, 8)  # Camera 8
-    multi_tracker.track(dummy_detection_cam9, 9)  # Camera 9
-    multi_tracker.track(dummy_detection_cam6, 6)  # Camera 6
-    assert len(multi_tracker.global_detections) == 4
+# def test_first_global_track():
+#     multi_tracker = MultiTracker(num_cameras=5, first_camera=5, mapper=Mapper(config.MAPPINGS, config.RESOLUTION, config.DISTORTION), cluster_eps=0.5, cluster_min_samples=2, max_age=5, max_cluster_distance=5, print_tracked=True)
+
+#     multi_tracker.track(dummy_detection_cam8, 8)  # Camera 8
+#     multi_tracker.track(dummy_detection_cam9, 9)  # Camera 9
+#     multi_tracker.track(dummy_detection_cam6, 6)  # Camera 6
+#     assert len(multi_tracker.global_detections) == 4
    
-    multi_tracker.globally_match_tracks()
+#     multi_tracker.globally_match_tracks()
     
-    assert len(multi_tracker.globally_tracked) == 1
+#     assert len(multi_tracker.globally_tracked) == 1
 
-def test_track_multiple_frames():
-    multi_tracker = MultiTracker(num_cameras=5, first_camera=5, mapper=Mapper(config.MAPPINGS, config.RESOLUTION, config.DISTORTION), cluster_eps=0.5, cluster_min_samples=2, max_age=5, max_cluster_distance=5, print_tracked=True)
+# def test_track_multiple_frames():
+#     multi_tracker = MultiTracker(num_cameras=5, first_camera=5, mapper=Mapper(config.MAPPINGS, config.RESOLUTION, config.DISTORTION), cluster_eps=0.5, cluster_min_samples=2, max_age=5, max_cluster_distance=5, print_tracked=True)
 
-    multi_tracker.track(dummy_detection_cam8, 8)  # Camera 8
-    multi_tracker.track(dummy_detection_cam9, 9)  # Camera 9
-    multi_tracker.track(dummy_detection_cam6, 6)  # Camera 6
-    assert len(multi_tracker.global_detections) == 4
+#     multi_tracker.track(dummy_detection_cam8, 8)  # Camera 8
+#     multi_tracker.track(dummy_detection_cam9, 9)  # Camera 9
+#     multi_tracker.track(dummy_detection_cam6, 6)  # Camera 6
+#     assert len(multi_tracker.global_detections) == 4
 
-    multi_tracker.globally_match_tracks()
-    assert len(multi_tracker.globally_tracked) == 1
-    assert len(multi_tracker.global_detections) == 0
+#     multi_tracker.globally_match_tracks()
+#     assert len(multi_tracker.globally_tracked) == 1
+#     assert len(multi_tracker.global_detections) == 0
     
-    # Simulate tracking in the next frame with the same detections
-    multi_tracker.track(dummy_detection_cam8, 8)  # Camera 8
-    multi_tracker.track(dummy_detection_cam9, 9)  # Camera 9
-    multi_tracker.track(dummy_detection_cam6, 6)  # Camera 6
-    assert len(multi_tracker.global_detections) == 4
+#     # Simulate tracking in the next frame with the same detections
+#     multi_tracker.track(dummy_detection_cam8, 8)  # Camera 8
+#     multi_tracker.track(dummy_detection_cam9, 9)  # Camera 9
+#     multi_tracker.track(dummy_detection_cam6, 6)  # Camera 6
+#     assert len(multi_tracker.global_detections) == 4
 
-    multi_tracker.globally_match_tracks()
-    assert len(multi_tracker.globally_tracked) == 1    
-    assert len(multi_tracker.global_detections) == 0
+#     multi_tracker.globally_match_tracks()
+#     assert len(multi_tracker.globally_tracked) == 1    
+#     assert len(multi_tracker.global_detections) == 0
 
-def test_no_detections():
-    multi_tracker = MultiTracker(num_cameras=5, first_camera=5, mapper=Mapper(config.MAPPINGS, config.RESOLUTION, config.DISTORTION), cluster_eps=0.5, cluster_min_samples=2, max_age=5, max_cluster_distance=5, print_tracked=True)
+# def test_no_detections():
+#     multi_tracker = MultiTracker(num_cameras=5, first_camera=5, mapper=Mapper(config.MAPPINGS, config.RESOLUTION, config.DISTORTION), cluster_eps=0.5, cluster_min_samples=2, max_age=5, max_cluster_distance=5, print_tracked=True)
 
-    # Simulate no detections in the first frame
-    multi_tracker.track([], 8)  # Camera 8
-    multi_tracker.track([], 9)  # Camera 9
-    multi_tracker.track([], 6)  # Camera 6
+#     # Simulate no detections in the first frame
+#     multi_tracker.track([], 8)  # Camera 8
+#     multi_tracker.track([], 9)  # Camera 9
+#     multi_tracker.track([], 6)  # Camera 6
 
-    assert len(multi_tracker.global_detections) == 0
+#     assert len(multi_tracker.global_detections) == 0
 
-    with pytest.raises(ValueError, match="No global detections to match."):
-        multi_tracker.globally_match_tracks()
+#     with pytest.raises(ValueError, match="No global detections to match."):
+#         multi_tracker.globally_match_tracks()
 
-def test_no_clusters():
-    multi_tracker = MultiTracker(num_cameras=5, first_camera=5, mapper=Mapper(config.MAPPINGS, config.RESOLUTION, config.DISTORTION), cluster_eps=0.5, cluster_min_samples=2, max_age=5, max_cluster_distance=5, print_tracked=True)
+# def test_no_clusters():
+#     multi_tracker = MultiTracker(num_cameras=5, first_camera=5, mapper=Mapper(config.MAPPINGS, config.RESOLUTION, config.DISTORTION), cluster_eps=0.5, cluster_min_samples=2, max_age=5, max_cluster_distance=5, print_tracked=True)
 
-    # Simulate only 2 detections from cam 8 (no cluster)
-    multi_tracker.track(dummy_detection_cam8, 8)  # Camera 8
-    multi_tracker.track([], 9)  # Camera 9
-    multi_tracker.track([], 6)  # Camera 6
+#     # Simulate only 2 detections from cam 8 (no cluster)
+#     multi_tracker.track(dummy_detection_cam8, 8)  # Camera 8
+#     multi_tracker.track([], 9)  # Camera 9
+#     multi_tracker.track([], 6)  # Camera 6
 
-    assert len(multi_tracker.global_detections) == 2
+#     assert len(multi_tracker.global_detections) == 2
 
-    with pytest.raises(ValueError, match="No clusters found."):
-        multi_tracker.globally_match_tracks()
+#     with pytest.raises(ValueError, match="No clusters found."):
+#         multi_tracker.globally_match_tracks()
 
 def test_handle_outiers():
     mapper = Mapper(config.MAPPINGS, config.RESOLUTION, config.DISTORTION)
-    multi_tracker = MultiTracker(config.NUM_CAMERAS, config.FIRST_CAMERA, mapper, config.CLUSTER_EPSILON, config.CLUSTER_MIN_SAMPLES, config.MAX_GLOBAL_AGE, config.MAX_CLUSTER_DISTANCE, False)
+    multi_tracker = MultiTracker(config.NUM_CAMERAS, config.FIRST_CAMERA, mapper, False)
+    
+    processed_paths_by_cam = {5:[], 6:[], 7:[], 8:[], 9:[]}
+    processed_paths_by_cam[8].append(problematic_path)
 
-    multi_tracker.processed_paths_by_cam[9] = dummy_batch_path_cam9
-    multi_tracker.handle_outliers(config.MAX_PIG_MVMT_BETWEEN_TWO_FRAMES)
+    print(f"path before processing: \n {processed_paths_by_cam[8]}")
 
-    for i in range(len(dummy_batch_path_cam9)):
-        print(f"\n\nPATH {i} : {multi_tracker.processed_paths_by_cam[9][i]}")
+    new = multi_tracker.handle_outliers(config.MAX_PIG_MVMT_BETWEEN_TWO_FRAMES, processed_paths_by_cam, None)
+
+    print(f"path after processing: \n{new[8]}")
+    # for i in range(len(dummy_batch_path_cam9)):
+    #     print(f"\n\nPATH {i} : {multi_tracker.processed_paths_by_cam[9][i]}")

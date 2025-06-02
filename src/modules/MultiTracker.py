@@ -9,20 +9,15 @@ from src.modules.Tracker import Tracker
 
 class MultiTracker:
 
-    def __init__(self, num_cameras=5, first_camera=5, mapper=None, cluster_eps=0.5, cluster_min_samples=2, max_age=5, max_cluster_distance=1, frechet_threshold=3, similarity_threshold=0.05, batch_size=10, overlapped_cams=[5, 6, 7], non_overlap_threshold=[-1.5, 1], print_tracked=False):
+    def __init__(self, num_cameras=5, first_camera=5, mapper=None,  frechet_threshold=3, similarity_threshold=0.05, frechet_euclidean_weights=[1.0, 0.5], batch_size=10, overlapped_cams=[5, 6, 7], non_overlap_threshold=[-1.5, 1], print_tracked=False):
         self.trackers = [Tracker() for _ in range(num_cameras)]
         self.mapper = mapper    
         self.num_cameras = num_cameras
         self.first_camera = first_camera
         self.overlapped_cams = overlapped_cams
 
-        # cluster parameters
-        self.cluster_eps = cluster_eps
-        self.cluster_min_samples = cluster_min_samples
-        self.max_cluster_distance = max_cluster_distance         # Maximum distance between two detections to be considered the same object
-
         # tracker parameters
-        self.max_age = max_age                                   # Maximum age of a track before it is removed -> might remove later
+        # self.max_age = max_age                                   # Maximum age of a track before it is removed -> might remove later
         self.global_detections = []                              # List of all detections from all cameras in real world coordinates
         self.globally_tracked = []                               # List of all tracked pigs in real world coordinates
         self.global_id_mapping = {}
@@ -38,15 +33,9 @@ class MultiTracker:
         self.global_batches_tracks = None                        # Overall "fusion" of each batch paths appended here 
         self.orphan_paths = []                                   # Paths that have not found a match yet, they will be checked for the remaining iterations
         self.non_overlap_threshold = non_overlap_threshold       # Defining zones of the pen that can only be seen by one camera
-        # max_frame_gap = 10                                     # Max time gap between
         self.max_path_length_ratio = 0.3                         # Max lengths ratio acceptable to match paths (avoid matching 2 points with a 20 points path)
+        self.frechet_euclidean_weights = frechet_euclidean_weights
 
-        # for logs 
-        self.pov_tracking_by_cam = {}
-        self.global_tracking_by_cam = {}
-        self.tracking_history = []
-        self.frame = 0
-    
     def save_tracking_history(self, file_path):
         """Save the tracking history to a JSON file."""
 
@@ -98,168 +87,12 @@ class MultiTracker:
             # print(f"GLOBAL DETECTIONS: {self.global_detections}")
         return tracks     
            
-# ============== Cluster implementation (not very efficient) =============
-    def globally_match_tracks(self):
-        """Once all detections from all cameras have been tracked, match them to global tracks using clustering."""
-
-        if len(self.globally_tracked) != 0:
-            history = {'global tracks': self.globally_tracked.copy(), 'frame' : self.frame}
-            print(f"\nFRAME {self.frame}: {history}\n")
-            self.tracking_history.append(history)   # 
-            self.frame += 1     # NOTE: This is the number of frames processed, need to do times 2 to get real number since we skip every 2nd frame
-
-        all_coords = np.array([d['world_coordinates'] for d in self.global_detections])
-
-        if len(all_coords) == 0:
-            raise ValueError("No global detections to match.")
-        
-        # Group all gloal detections using DBSCAN (Density-Based Spatial Clustering of Applications with Noise) clustering
-        clusters = DBSCAN(eps=self.cluster_eps, min_samples=self.cluster_min_samples).fit(all_coords)
-
-        # Compute cluster center coordinates and labels pairs
-        cluster_center_label_pairs = self.get_center_label_pairs(clusters, all_coords)      # [((x, y), cluster_id), ...]
-
-        # print(f"Cluster centers: {cluster_center_label_pairs}")
-
-        if len(cluster_center_label_pairs) == 0:
-            raise ValueError("No clusters found.")
-        
-        self.match_clusters_with_previous_tracks(cluster_center_label_pairs)  # Update global detections with cluster centers
-        return self.globally_tracked
-
-    def match_clusters_with_previous_tracks(self, cluster_center_label_pairs): 
-        # Update global detections with cluster centers
-        if not self.globally_tracked:
-            # first frame, initialize tracks for all detections
-            for center, label in cluster_center_label_pairs:
-                
-                # Skip noise points
-                if label == -1:
-                    continue
-
-                # detection['global_id'] = int(label)
-                self.globally_tracked.append({
-                    "id": label,
-                    "center": center,
-                    "age": 0
-                })
-            self.global_detections = []  # Clear global detections after processing
-            return self.globally_tracked
-        
-        # if no detections age all tracks and remove old ones
-        if len(cluster_center_label_pairs) == 0:    
-            for track in self.globally_tracked:
-                track["age"] += 1
-            self.globally_tracked = [track for track in self.globally_tracked if track["age"] <= self.max_age]
-            self.global_detections = []  # Clear global detections after processing
-            return self.globally_tracked
-        
-        track_cluster_pairs = self.compute_track_cluster_pairs(cluster_center_label_pairs)
-
-        # Track assignments
-        assigned_tracks = set()
-        assigned_clusters = set()
-
-        # Assign detections to tracks
-        for track_idx, cluster_label_idx, _ in track_cluster_pairs:
-            cluster_label = cluster_center_label_pairs[cluster_label_idx][1]
-            cluster_center = cluster_center_label_pairs[cluster_label_idx][0]
-            track_label = self.globally_tracked[track_idx]["id"]
-            if track_label not in assigned_tracks and cluster_label not in assigned_clusters:
-                assigned_tracks.add(track_label)
-                assigned_clusters.add(cluster_label)
-                
-                # Update track with new detection
-                self.globally_tracked[track_idx]["center"] = cluster_center
-                self.globally_tracked[track_idx]["age"] = 0  # Reset age for matched tracks
-                
-        # Handle unmatched detections (new pigs)
-        for j in range(len(cluster_center_label_pairs)):
-            if cluster_center_label_pairs[j][1] not in assigned_clusters:
-                self.globally_tracked.append({
-                    "id": cluster_center_label_pairs[j][1],
-                    "center": cluster_center_label_pairs[j][0],
-                    "age": 0
-                })
-        
-        # Increase age for unmatched tracks
-        for i in range(len(self.globally_tracked)):
-            if self.globally_tracked[i]['id'] not in assigned_tracks:
-                self.globally_tracked[i]["age"] += 1
-        
-        # Remove old tracks
-        self.globally_tracked = [track for track in self.globally_tracked if track["age"] <= self.max_age]
-        
-        if self.print_tracked:
-            print(f"Tracked pigs: {len(self.globally_tracked)}")
-            for track in self.globally_tracked:
-                print(f"Track ID: {track['id']}, Age: {track['age']}, Center: {track['center']}")
-
-        self.global_detections = []  # Clear global detections after processing
-        return self.globally_tracked
-
-    def compute_track_cluster_pairs(self, clusters_label_pairs):
-        # NOTE: only based on distance between cluster centers and track centers, might not be very accurate
-
-        # intialize cost matrix 
-        cost_matrix = np.zeros((len(self.globally_tracked), len(clusters_label_pairs)))
-
-        # Iterate over all tracks and detections to fill the cost matrix
-        for i, track in enumerate(self.globally_tracked):
-            for j, (center, label) in enumerate(clusters_label_pairs):
-
-                cluster_distance = distance.euclidean(track['center'], center)
-
-                # Check thresholds for distance and IoU
-                if cluster_distance < self.max_cluster_distance:
-
-                    # Normalize distance between [0,1] by dividing by max_distance
-                    norm_distance = min(cluster_distance / self.max_cluster_distance, 1.0)
-
-                    # Combine with weighted sum
-                    cost_matrix[i, j] = norm_distance
-        
-        # Sort all track-detection pairs by distance
-        track_detection_pairs = []
-        for i in range(len(self.globally_tracked)):     # Index of tracks
-            for j in range(len(clusters_label_pairs)):  # Index of pair 
-                if cost_matrix[i, j] >= 0 and cost_matrix[i, j] <= 1.0:
-                    track_detection_pairs.append((i, j, cost_matrix[i, j]))
-        
-        # Sort by distance 
-        track_detection_pairs.sort(key=lambda x: x[2])
-
-        return track_detection_pairs
-
-    def get_center_label_pairs(self, clusters, all_coords):
-        labels = clusters.labels_   # array of cluster labels for each point (-1 for noise) -> eg: array([0, 0, 0, 1, 1, 2, -1, 1, 2, 0])
-        unique_labels = list(set(label for label in labels if label != -1))
-        cluster_center_label_pairs = []  # list of tuples (cluster center id, cluster id) for all cluster centers
-
-        # Compute the center of each cluster
-        for label in unique_labels:
-            points_in_cluster = all_coords[labels == label]
-            center = points_in_cluster.mean(axis=0)
-            cluster_center_label_pairs.append(((center[0], center[1]), label))      # [((x, y), cluster_id), ...]
-
-        return cluster_center_label_pairs
-
 # =============== Batch implementation ==============================
-    def batch_match(self, paths_list1, paths_list2, cam_id1, cam_id2):  # paths_list = [ [((x1, y1), f1), ((x2, y2), f2), ...], ... ]
+    def batch_match(self, paths_list1, paths_list2, cam_id1, cam_id2, output_dir):  # paths_list = [ [((x1, y1), f1), ((x2, y2), f2), ...], ... ]
         """
         Match and merge similar paths from two different camera views.
         paths_list = [ [((x1, y1), f1), ((x2, y2), f2), ...], ... ]
         """
-
-
-
-        # TODO: if 2 "different" paths from a pov dont have frames in common and match to a single path from another pov, could be the same pig taht was wrongly 
-        # re id in one pov -> handle this. 
-        
-        # TODO: store coords of path of each cams to plot a bunch of graph : 2 per cams (cam coords and global coords, 2 self vars created in init) and then plot of global movements 
-        # TODO: think about how to overlap batches for more accuracy
-
-        # TODO: extenslively test batch_match
         
         # Check parameters
         if self.batch_size == None:
@@ -300,8 +133,8 @@ class MultiTracker:
                 coords1 = [p[0] for p in path1]
                 coords2 = [p[0] for p in path2]
 
-                # Compute Frechet distance between paths
-                paths_dist = frechet_distance(LineString(coords1), LineString(coords2))
+                # Compute Frechet distance between paths and add the min distance between endpoints
+                paths_dist = frechet_distance(LineString(coords1), LineString(coords2)) #+ min(self.euclidean_distance(coords1[-1], coords2[0]), self.euclidean_distance(coords2[-1], coords1[0]))
 
                 # Fill cost matrix
                 cost_matrix[i, j] = paths_dist
@@ -309,67 +142,67 @@ class MultiTracker:
         # Check if cost matrix is not empty
         if np.all(np.isinf(cost_matrix)):
             if empty_paths1 == len_paths_1 and empty_paths2 == len_paths_2:
+                # Logs
+                with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                    f.write(f"\n\nNo paths in either cam {cam_id1} and {cam_id2} \n\n")
                 return paths_list1
             elif empty_paths1 == len_paths_1:
+                # Logs
+                with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                    f.write(f"\n\nNo paths in cam {cam_id1}\n\n")
                 return paths_list2
             elif empty_paths2 == len_paths_2:
+                # Logs
+                with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                    f.write(f"\n\nNo paths in cam {cam_id2} \n\n")
                 return paths_list1
             else: 
                 raise ValueError
 
-        valid_pairs = [(i, j) for i in range(len_paths_1) for j in range(len_paths_2) if not np.isinf(cost_matrix[i, j])]
-
-        if not valid_pairs:
-            raise ValueError
-
-        # Build submatrix
-        rows = sorted(set(i for i, _ in valid_pairs))
-        cols = sorted(set(j for _, j in valid_pairs))
-        submatrix = cost_matrix[np.ix_(rows, cols)]
-
-        row_ind_sub, col_ind_sub = linear_sum_assignment(submatrix)
-
-        # Map back to original indices
-        row_ind = [rows[i] for i in row_ind_sub]
-        col_ind = [cols[j] for j in col_ind_sub]
-
-        # Apply Hungarian algorithm
-        # row_ind, col_ind = linear_sum_assignment(cost_matrix)
-
-        # paths_pairs = []
-        # for i in range(len(paths_list1)):
-        #     for j in range(len(paths_list2)):
-        #         if cost_matrix[i, j] <= self.frechet_threshold:
-        #             paths_pairs.append((paths_list1[i], paths_list2[j], cost_matrix[i, j]))
+        # Sort all path pairs by frechet distance
+        best_paths_pairs = []
+        for i in range(len(paths_list1)):
+            for j in range(len(paths_list2)):
+                if cost_matrix[i, j] >= 0 and cost_matrix[i, j] <= self.frechet_threshold:
+                    best_paths_pairs.append((i, j, cost_matrix[i, j]))
         
-        # # Sort by Frechet distance
-        # paths_pairs.sort(key=lambda x:x[2])
-
-        # If path appears only once -> keep (might be a pig visible in only one pov) 
-        # -> should this apply to all cams or only ones that have zone with no overlaps
-        # If path has matches -> keep only the best one 
+        # Sort by frechet distance 
+        best_paths_pairs.sort(key=lambda x: x[2])
 
         # Track assignments
         assigned_paths1 = set()
         assigned_paths2 = set()
 
-        for i, j in zip(row_ind, col_ind):
-            if cost_matrix[i, j] <= self.frechet_threshold:
-                merged_path = self.merge_paths(paths_list1[i], paths_list2[j], self.batch_size)
+        for path1_idx, path2_idx, _ in best_paths_pairs:
+            if path1_idx not in assigned_paths1 and path2_idx not in assigned_paths2:
+                
+                # Logs
+                with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                    f.write(f"\n\nBest frechet dist found between path\n {paths_list1[i]}\n and \n{paths_list2[j]}\n is \n{cost_matrix[i, j]}. Merging and adding path. \n\n")
+                
+                # Merge and add path to global tracks
+                merged_path = self.merge_paths(paths_list1[path1_idx], paths_list2[path2_idx], self.batch_size)
                 global_paths.append(merged_path)
-                assigned_paths1.add(i)
-                assigned_paths2.add(j)
-
+                assigned_paths1.add(path1_idx)
+                assigned_paths2.add(path2_idx)
+                
         # Function to check if a pig is in a zone covered by only one cam 
         def is_outside_overlap(path):
             avg_y = (path[0][0][1] + path[-1][0][1]) / 2
-            return avg_y <= self.non_overlap_threshold[0] or avg_y >= self.non_overlap_threshold[1] 
+            return avg_y <= self.non_overlap_threshold[0] or (avg_y >= self.non_overlap_threshold[1])
 
         # Iterate through the remaining non assigned paths
         for i, path in enumerate(paths_list1):
             if i not in assigned_paths1:
                 # Add paths if it is in a zone covered only by that camera
-                if cam_id1 not in self.overlapped_cams or is_outside_overlap(path):
+                if cam_id1 not in self.overlapped_cams and is_outside_overlap(path):
+                    # Logs
+                    with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                        f.write(f"\n\nPath:\n {path}\n no match found but is in non-overlapped zone, so adding it. \n\n")
+                    global_paths.append(path)
+
+                # If paths_list1  is already the combination of 2 povs
+                elif cam_id1 is None:
                     global_paths.append(path)
                 
                 # Check with orphans paths (non assigned paths) from previous cameras
@@ -385,8 +218,16 @@ class MultiTracker:
         # Repeat for second paths list
         for j, path in enumerate(paths_list2):
             if j not in assigned_paths2:
-                if cam_id2 not in self.overlapped_cams or is_outside_overlap(path):
+                if cam_id2 not in self.overlapped_cams and is_outside_overlap(path):
+                    # Logs
+                    with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                        f.write(f"\n\nPath:\n {path}\n no match found but is in non-overlapped zone, so adding it. \n\n")
                     global_paths.append(path)
+
+                # If path_list2 is already the combination of 2 povs
+                elif cam_id2 is None:
+                    global_paths.append(path)
+
                 else:
                     merged_path, found = self.check_orphan_paths(path)
                     if found:
@@ -394,58 +235,13 @@ class MultiTracker:
                     else:
                         self.orphan_paths.append(path)
 
+        # Logs
+        with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+            f.write(f"\n\nPaths AFTER batch_match between cam {cam_id1} and {cam_id2} ({len(global_paths)} paths): \n\n")
+            for i, path in enumerate(global_paths):
+                f.write(f"\npath {i}: {path}\n")
+
         return global_paths
-
-        # for path1, path2, _ in paths_pairs:
-        #     path1_id = id(path1)     # need to convert to ids because lists are not hashable
-        #     path2_id = id(path2)
-        #     if path1_id not in assigned_paths1 and path2_id not in assigned_paths2:  
-        #         assigned_paths1.add(path1_id)
-        #         assigned_paths2.add(path2_id)
-
-        #         merged_path = self.merge_paths(path1, path2, self.batch_size)
-        #         global_paths.append(merged_path)
-
-        # # Add path that could potentially only be seen by one cam
-        # if cam_id1 not in self.overlapped_cams:
-        #     for path1 in paths_list1:
-        #         first_path_point = path1[0][0]
-        #         last_path_point = path1[-1][0]
-        #         if (((first_path_point[1] + last_path_point[1]) / 2) <= -1.5) or (((first_path_point[1] + last_path_point[1]) / 2) >= 1):
-        #             path1_id = id(path1)
-        #             if path1_id not in assigned_paths1 and path1_id not in global_paths:
-        #                 global_paths.append(path1)
-        #                 assigned_paths1.add(path1_id)
-        #         else:
-        #             merged_path, found = self.check_orphan_paths(path1)
-        #             if not found:
-        #                 self.orphan_paths.append(path1)
-        #                 # print(f"\norphan path : {path1}\ncam id {cam_id1}, avgpoint : {((first_path_point[1] + last_path_point[1]) / 2)}")
-
-        #             elif found:
-        #                 global_paths.append(merged_path)
-         
-        # if cam_id2 not in self.overlapped_cams:
-        #     for path2 in paths_list2:
-        #         first_path_point = path2[0][0]
-        #         last_path_point = path2[-1][0]
-
-        #         if (((first_path_point[1] + last_path_point[1]) / 2) <= -1.5) or (((first_path_point[1] + last_path_point[1]) / 2) >= 1):
-        #             path2_id = id(path2)
-        #             if path2_id not in assigned_paths2 and path2_id not in global_paths:
-        #                 global_paths.append(path2)
-        #                 assigned_paths2.add(path2_id)
-                        
-        #         else:
-        #             merged_path, found = self.check_orphan_paths(path2)
-        #             if not found:
-        #                 self.orphan_paths.append(path2)
-        #                 # print(f"\norphan path : {path2}\ncam id {cam_id2}, avgpoint : {((first_path_point[1] + last_path_point[1]) / 2)}")
-
-        #             elif found:
-        #                 global_paths.append(merged_path)
-
-        # return global_paths
 
     def check_orphan_paths(self, path_to_check):
         """Check if some paths that were not matched in previous batches can be match in current batch"""
@@ -468,15 +264,6 @@ class MultiTracker:
             if len(orphan_path) < 2:
                 continue
             
-            # # Frame-based filter
-            # start_check = path_to_check[0][1]
-            # end_check = path_to_check[-1][1]
-            # start_orphan = orphan_path[0][1]
-            # end_orphan = orphan_path[-1][1]
-            # frame_gap = min(abs(start_check - start_orphan), abs(end_orphan - end_check))
-            # if frame_gap > self.max_frame_gap:
-            #     continue
-
             # Length consistency filter
             len_ratio = min(len(path_to_check), len(orphan_path)) / max(len(path_to_check), len(orphan_path))
             if len_ratio < self.max_path_length_ratio:
@@ -505,37 +292,6 @@ class MultiTracker:
 
         return None, False
 
-
-        # cost_array = []
-        # for j, orphan_path in enumerate(self.orphan_paths):
-
-        #     if len(path_to_check) < 2 or len(orphan_path) < 2:
-        #         cost_array.append(np.inf)
-        #         continue        # If single point, no path to compare
-            
-        #     # Separate points coordinates from frame numbers to compute frechet dist
-        #     points_path1 = [t[0] for t in path_to_check]
-        #     points_path2 = [t[0] for t in orphan_path]
-
-        #     paths_dist = frechet_distance(LineString(points_path1), LineString(points_path2))
-        #     cost_array.append(paths_dist)
-    
-        # potential_path = []
-        # for j in range(len(self.orphan_paths)):
-        #     if cost_array[j] <= self.frechet_threshold:
-        #         potential_path.append((self.orphan_paths[j], cost_array[j]))
-
-        # if len(potential_path) > 0:
-        #     # Sort by Frechet distance
-        #     potential_path.sort(key=lambda x:x[1])
-
-        #     merged_path = self.merge_paths(path_to_check, potential_path[0][0], self.batch_size)
-
-        #     return merged_path, True
-        
-        # else: 
-        #     return None, False
-
     @staticmethod
     def merge_paths(path1, path2, batch_size):      #  path = [((x1, y1), f1), ((x2, y2), f2), ...] NOTE: should be sorted by frame numbers f1<f2<f3...
 
@@ -563,68 +319,76 @@ class MultiTracker:
 
         return final_path
 
-    def remove_duplicate_paths(self, merged_paths:list):
-        """Remove near-duplicate paths (Fréchet distance too small)."""
-        n = len(merged_paths)
-        to_remove_indices = set()
+    def remove_duplicate_paths(self, merged_paths:list, total_nb_pig):
+        """Select spatially unique, dynamic, and well-separated paths."""
 
-        for i in range(n):
-            if i in to_remove_indices or len(merged_paths[i]) < 2:
+        filtered = []
+        for path in merged_paths:
+            # remove path that have the same values for all their x or y coordinates
+            if len(path) < 2:
                 continue
-            points_i = [pt[0] for pt in merged_paths[i]]
-            for j in range(i + 1, n):
-                if j in to_remove_indices or len(merged_paths[j]) < 2:
+            xs = [p[0][0] for p in path]
+            ys = [p[0][1] for p in path]
+            if len(set(xs)) > 1 and len(set(ys)) > 1:
+                filtered.append(path)
+
+        scores = []
+        avg_positions = []
+
+        for i, path_i in enumerate(filtered):
+            if len(path_i) < 2:
+                continue
+
+            points_i = [pt[0] for pt in path_i]
+            avg_pos_i = np.mean(points_i, axis=0)
+            avg_positions.append((i, avg_pos_i))
+
+        for i, path_i in enumerate(filtered):
+            if len(path_i) < 2:
+                continue
+
+            points_i = [pt[0] for pt in path_i]
+            line_i = LineString(points_i)
+
+            # 1. Minimum Frechet distance to other paths
+            min_frechet = float("inf")
+            for j, path_j in enumerate(filtered):
+                if i == j or len(path_j) < 2:
                     continue
-                points_j = [pt[0] for pt in merged_paths[j]]
-                dist = frechet_distance(LineString(points_i), LineString(points_j))
-                if dist <= self.similarity_threshold:
-                    # Remove the shorter path
-                    if len(merged_paths[i]) < len(merged_paths[j]):
-                        to_remove_indices.add(i)
-                        break  # Don't need to check i against others
-                    else:
-                        to_remove_indices.add(j)
+                points_j = [pt[0] for pt in path_j]
+                line_j = LineString(points_j)
+                dist = frechet_distance(line_i, line_j)
+                min_frechet = min(min_frechet, dist)
 
-        # Build filtered path list
-        filtered_paths = [p for idx, p in enumerate(merged_paths) if idx not in to_remove_indices]
-        return filtered_paths
+            # 2. Average movement in the path
+            avg_euclidean = np.mean([
+                self.euclidean_distance(points_i[k], points_i[k + 1])
+                for k in range(len(points_i) - 1)
+            ])
 
-        """previous version"""
-        # paths_to_remove = []
+            # 3. Minimum average position distance to other paths
+            avg_pos_i = avg_positions[i][1]
+            min_avg_pos_dist = min([
+                self.euclidean_distance(avg_pos_i, avg_positions[j][1])
+                for j in range(len(avg_positions)) if j != i
+            ])
 
-        # # Check frechet distance between all paths
-        # for checked_idx, path1 in enumerate(merged_paths):
-        #     # Check path1 is not empty
-        #     if len(path1) == 0:
-        #         continue
-        #     for path2 in merged_paths[(checked_idx + 1):]:
-        #         # Check path2 is not empty
-        #         if len(path2) == 0:
-        #             continue
-        #         if path1 == path2 or path2 in paths_to_remove: 
-        #             continue
+            # Weighted score (you can tune the weights)
+            score = (
+                0.8 * min_frechet + 
+                0 * avg_euclidean + 
+                0.2 * min_avg_pos_dist
+            )
+            scores.append((i, score))
 
-        #         # Separate points coordinates from frame numbers to compute frechet dist
-        #         points_path1 = [t[0] for t in path1]
-        #         points_path2 = [t[0] for t in path2]
+        # Sort and keep the best
+        scores.sort(key=lambda x: x[1], reverse=True)
+        top_indices = [idx for idx, _ in scores[:total_nb_pig]]
+        return [filtered[i] for i in top_indices]
 
-        #         paths_dist = frechet_distance(LineString(points_path1), LineString(points_path2))
-
-        #         if paths_dist <= self.similarity_threshold:
-        #             if len(path1) < len(path2) and path1 not in paths_to_remove:
-        #                 paths_to_remove.append(path1)
-        #                 break
-        #             else:
-        #                 paths_to_remove.append(path2)
-
-        # # Remove paths 
-        # for path in paths_to_remove:
-        #     merged_paths.remove(path)
-
-        # return merged_paths
-
-    def extend_global_paths(self, merged_paths, output_dir, overlap_frames):
+    def extend_global_paths(self, merged_paths, output_dir, overlap_frames, batch_size):
         """Match global merged paths from new batch to current global paths using the Hunagrian algorithm"""
+
         existing_paths = self.global_batches_tracks
         num_existing = len(existing_paths)
         num_new = len(merged_paths)
@@ -636,7 +400,7 @@ class MultiTracker:
                 continue
             
             # Take last 10 points or all if fewer
-            ex_traj = [p[0] for p in ex_path[-overlap_frames:]]
+            ex_traj = [p[0] for p in ex_path[-overlap_frames:] if p[1] >= batch_size - overlap_frames]
 
             # last point in case frechet fails
             ex_end = ex_path[-1][0]
@@ -646,17 +410,25 @@ class MultiTracker:
                     continue
 
                 # Take first 10 points or all if fewer
-                new_traj = [p[0] for p in new_path[:overlap_frames]]
+                new_traj = [p[0] for p in new_path[:overlap_frames] if p[1] < overlap_frames]
                 
                 # First point in case frechet fails
                 new_start = new_path[0][0]
 
                 # Compute Fréchet distance
                 try:
-                    dist = frechet_distance(LineString(ex_traj), LineString(new_traj))
-                    cost_matrix[i, j] = dist
+                    frechet_dist = frechet_distance(LineString(ex_traj), LineString(new_traj))
+
+                    # Compute average Euclidean distance
+                    min_len = min(len(ex_traj), len(new_traj))
+                    avg_euc = np.mean([self.euclidean_distance(ex_traj[k], new_traj[k]) for k in range(min_len)])
+
+                    # Combine into a final cost
+                    total_cost = self.frechet_euclidean_weights['Frechet'] * frechet_dist + self.frechet_euclidean_weights['Euclidean'] * avg_euc  
+                    cost_matrix[i, j] = total_cost
                 except Exception as e:
-                    print(f"-----------Error computing Fréchet distance: {e}---------------\nUsing Euclidean distance instead.\n")
+                    with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                        f.write(f"-----------Error computing Fréchet distance: {e}---------------\nUsing Euclidean distance instead.\n")
                     cost_matrix[i, j] = self.euclidean_distance(ex_end, new_start)
                     continue
                 
@@ -676,34 +448,47 @@ class MultiTracker:
         # Apply Hungarian algorithm
         row_ind, col_ind = linear_sum_assignment(reduced_cost_matrix)
 
-        # Filter out assignments where cost is too high (optional)
-        # For example, skip assignments above a certain threshold
-        # threshold = 50.0
-        # assignments = [(r, c) for r, c in zip(row_ind, col_ind) if cost_matrix[r, c] < threshold]
-
         # Merge paths in global_batches_tracks
         for r, c in zip(row_ind, col_ind):
             i = valid_row_idx[r]
             j = valid_col_idx[c]
-            # NOTE: Could add a threshold here 
+
+            
+            cost = reduced_cost_matrix[r, c]
+            if cost > 5:
+                continue
 
             # Debugging
             with open(f"{output_dir}\\paths_merging.txt", "a") as f:
                 f.write(f"\n\nmerging existing path: \n {existing_paths[i]}\n\n and new path \n\n {merged_paths[j]}\n\n")
-                
+
             existing_paths[i].extend(merged_paths[j])
 
         return existing_paths
             
-    def handle_outliers(self, max_mvmt_between_frames, paths_by_cam):
+    def handle_outliers(self, max_mvmt_between_frames, paths_by_cam:dict, output_dir):
         """Go through all paths and reassign points that were wrongly ided to the right path"""
+        
+        # Logs
+        if output_dir is not None:
+            with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                f.write("-------------- handle outliers analysis -----------------")
+                f.write(f"\npaths before handling outliers:\n")
+                for cam_id, paths_list in paths_by_cam.items():
+                    f.write(f"=== cam {cam_id} ===")
+                    for i, path in enumerate(paths_list):
+                        f.write(f"\npath {i}: {path}\n")
 
         for cam_id, paths_list in paths_by_cam.items():
+            # print(f"cam {cam_id}\npaths_list:{paths_list}")
             outliers = []
             frames_present_in_paths = []
 
             # Extract outliers from each path without mutating during iteration
             for path in paths_list:
+                
+
+                removed_in_a_row = 0
                 frames_present = set()
                 to_remove = []
                 for i in range(len(path) - 1):
@@ -712,13 +497,16 @@ class MultiTracker:
                         idx1 -= 1
                     point1 = path[idx1]
                     point2 = path[i + 1]
+
                     frames_present.add(point1[1])
 
-                    if self.euclidean_distance(point1[0], point2[0]) > max_mvmt_between_frames:
+                    if self.euclidean_distance(point1[0], point2[0]) > max_mvmt_between_frames or removed_in_a_row > 50:
                         outliers.append(point2)
                         to_remove.append(i + 1)
+                        removed_in_a_row += 1
                     else:
                         frames_present.add(point2[1])
+                        removed_in_a_row = 0
                 
                 # Remove outliers after iteration (avoid index shifting)
                 for index in sorted(to_remove, reverse=True):
@@ -750,81 +538,102 @@ class MultiTracker:
                         outliers_placed.append(outlier)
                         break  # only assign to one path
 
-        return paths_by_cam
-
-
-
-        # for cam_id, paths_list in paths_by_cam.items():
-        #     outliers = []
-        #     frames_present_in_paths = []
-        #     for path in paths_list:
-        #         frames_present = []
-        #         i = 0
-        #         while i + 1 < len(path) and path[i + 1]:
-        #             point1 = path[i]
-        #             point2 = path[i + 1]
-        #             frames_present.append(point1[1])
-
-        #             # Check if distance between points is below threshold
-        #             if self.euclidean_distance(point1[0], point2[0]) > max_mvmt_between_frames: 
-        #                 outliers.append(point2)
-        #                 path.remove(point2)
-        #             else:
-        #                 frames_present.append(point2[1])
-        #                 i += 1
-        #         frames_present_in_paths.append(set(frames_present))
-
-        #     # Sort by euclidean distance
-        #     outliers.sort(key=lambda outlier: outlier[1])
-        #     outliers_placed = []
-        #     for outlier in outliers:
-        #         for path_idx, frames_path in enumerate(frames_present_in_paths):
-        #             frame_number_outlied = outlier[1]
-        #             coords_outlied = outlier[0]
-        #             if frame_number_outlied not in frames_path and len(frames_path) > 1:
-
-        #                 if frame_number_outlied - 1 >= 0 and frame_number_outlied - 1 < len(paths_list[path_idx]):
-        #                     if self.euclidean_distance(coords_outlied, paths_list[path_idx][frame_number_outlied - 1][0]) < max_mvmt_between_frames:
-        #                         paths_list[path_idx].insert(frame_number_outlied, outlier)
-        #                         outliers_placed.append(outlier)
-        #                         break
-
-        # return paths_by_cam
-
-    def merge_incomplete_paths(self, paths_list, batch_size, max_mvmt_pig):
-        """Merge short paths that are close in time and space."""
-
-        # Identify incomplete paths (shorter than 40% of batch)
-        incomplete_indices = [i for i, path in enumerate(paths_list) if len(path) <= int(0.4 * batch_size)]
-        completed_paths = [path for i, path in enumerate(paths_list) if i not in incomplete_indices]
-
-        # Attempt to merge incomplete paths pairwise
-        found_continuation = set()
-        for i in incomplete_indices:
-            if i in found_continuation: continue
-            for j in incomplete_indices:
-                if i == j:
+            # idx_pig = None
+            # Check if point is in pen boundaries, if not shift it into them
+            for idx, path in enumerate(paths_list):
+                if len(path) == 0:
                     continue
 
-                path_i = paths_list[i]
-                path_j = paths_list[j]
+                # corner_pig = all(pt[0][0] >= 2.1 and pt[0][1] >= 2 for pt in path)
+                for i, point in enumerate(path):
+                    point = self.check_point_in_boundaries(point)
+                    path[i] = point
+            #     if corner_pig:
+            #         idx_pig = idx
+            # if idx_pig is not None:
+            #     paths_by_cam[cam_id] = [paths_list[i] for i in range(len(paths_list)) if i != idx_pig]
+                        
+        # Logs 
+        if output_dir is not None:
+            with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                f.write(f"\n\n\npaths AFTER handling outliers:\n")
+                for cam_id, paths_list in paths_by_cam.items():
+                    f.write(f"=== cam {cam_id} ===")
+                    for i, path in enumerate(paths_list):
+                        f.write(f"\npath {i}: {path}\n")
+                f.write("------------------------------------------------")
+                
+        return paths_by_cam
 
-                if not path_i or not path_j:
+    def merge_incomplete_paths(self, paths_list, batch_size, max_mvmt_pig, output_dir):
+        """Merge short paths that are close in time and space."""
+                
+        # Logs
+        with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+            f.write(f"\n\nPaths before merge_incomplete_paths ({len(paths_list)} paths): \n\n")
+            for i, path in enumerate(paths_list):
+                f.write(f"\npath {i}: {path}\n")
+
+        found_continuation = {i: None for i in range(len(paths_list))}  # {path index in paths_list : continuation path idx in paths_list}
+        found_preceding = {i: None for i in range(len(paths_list))}     # {path index in paths_list : continuation path idx in paths_list}
+
+        for i, path_i in enumerate(paths_list):
+            if found_continuation[i] != None or not path_i: 
+                continue
+  
+            for j, path_j in enumerate(paths_list):
+                if i == j or not path_j or found_preceding[j] != None:
                     continue
 
                 end_i = path_i[-1]
                 start_j = path_j[0]
 
                 # Only merge if path_j is a continuation of path_i
-                if end_i[1] < start_j[1] and self.euclidean_distance(end_i[0], start_j[0]) <= max_mvmt_pig:
-                    merged = path_i + path_j
-                    completed_paths.append(merged)
-                    found_continuation.add(i)
-                    # used.add(j)
-                    break  
+                if (
+                end_i[1] < start_j[1]                                                 # frame number of end of path_i is smaller than frame number of start of path_j
+                and start_j[1] - end_i[1] < 0.3 * batch_size                          # the time difference between the two paths is not too big
+                and self.euclidean_distance(end_i[0], start_j[0]) <= max_mvmt_pig     # euclidean distance between end and start of the two paths is small enough
+                and len(path_i) + len(path_j) <= batch_size):                         # the combined size of the paths is not bigger than batch size 
+                    
+                    found_continuation[i] = j 
+                    found_preceding[j] = i
+                    break 
 
-        # Remove leftover short paths (noise)
-        return [path for path in completed_paths if len(path) > int(0.4 * batch_size)]            
+        final_merged_paths = []
+        visited = set()
+        
+        for idx in range(len(paths_list)):
+            if idx in visited or not paths_list[idx]: 
+                continue
+            path = paths_list[idx].copy()
+            visited.add(idx)
+
+            # Forward merge
+            continuation = found_continuation[idx]
+            while continuation is not None and continuation not in visited:
+                next_continuation = found_continuation[continuation]
+                path += paths_list[continuation]
+                visited.add(continuation)
+                continuation = next_continuation
+
+            # Backward merge
+            preceding = found_preceding[idx]
+            while preceding is not None and preceding not in visited:
+                next_preceding = found_preceding[preceding]
+                path = paths_list[preceding] + path
+                visited.add(preceding)
+                preceding = next_preceding
+            
+            if ((path is not None) and (len(path) > 0.4 * batch_size)):
+                final_merged_paths.append(path)
+                
+        # Logs
+        with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+            f.write(f"\n\nPaths AFTER merge_incomplete_paths ({len(final_merged_paths)} paths): \n\n")
+            for i, path in enumerate(final_merged_paths):
+                f.write(f"\npath {i}: {path}\n")
+        
+        return final_merged_paths
         
     @staticmethod
     def euclidean_distance(p1, p2):
@@ -854,3 +663,14 @@ class MultiTracker:
             tracker.reinitialize_id_count()
         
         return
+    
+    @staticmethod
+    def check_point_in_boundaries(original_point):
+        coords = list(original_point[0])  # (x, y)
+        frame = original_point[1]
+
+        # Clamp x and y
+        x = max(0, min(2.5, coords[0]))
+        y = max(-3, min(3, coords[1]))
+
+        return ((x, y), frame)
