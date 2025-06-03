@@ -234,7 +234,7 @@ class PigMonitor:
     def batch_monitor(self):
         """Main monitoring function, sets up and run monitoring. Saves all paths to a json file when finished running."""
         
-        self.multi_tracker.global_batches_tracks = [[] for _ in range(config.NUM_PIGS + 10)]
+        self.multi_tracker.global_batches_tracks = [[] for _ in range(config.NUM_PIGS)]
 
         video_caps, out = self.set_up_monitoring()
         with open(f"{config.OUTPUT_DIR}\\paths_merging.txt", "w") as f:
@@ -322,6 +322,7 @@ class PigMonitor:
                     output_dir=config.OUTPUT_DIR, 
                     overlap_frames=config.REWIND_FRAMES,
                     batch_size=config.BATCH_SIZE,
+                    batch_count=batch_count,
                     )                
 
             # Rewind a number of frames to overlap with next batch

@@ -1,10 +1,8 @@
-from sklearn.cluster import DBSCAN
 from scipy.optimize import linear_sum_assignment
 import numpy as np
 import math
 from shapely import LineString, frechet_distance
 import json
-from scipy.spatial import distance
 from src.modules.Tracker import Tracker
 
 class MultiTracker:
@@ -128,7 +126,7 @@ class MultiTracker:
                 if len(path2) <2:
                     empty_paths2 += 1   # keep track of number of empty paths
                     continue       
-                
+
                 # Separate points coordinates from frame numbers to compute frechet dist
                 coords1 = [p[0] for p in path1]
                 coords2 = [p[0] for p in path2]
@@ -386,8 +384,8 @@ class MultiTracker:
         top_indices = [idx for idx, _ in scores[:total_nb_pig]]
         return [filtered[i] for i in top_indices]
 
-    def extend_global_paths(self, merged_paths, output_dir, overlap_frames, batch_size):
-        """Match global merged paths from new batch to current global paths using the Hunagrian algorithm"""
+    def extend_global_paths(self, merged_paths, output_dir, overlap_frames, batch_size, batch_count):
+        """Match global merged paths from new batch to current global paths"""
 
         existing_paths = self.global_batches_tracks
         num_existing = len(existing_paths)
@@ -409,60 +407,117 @@ class MultiTracker:
                 if len(new_path) < 2:
                     continue
 
-                # Take first 10 points or all if fewer
+                # Take all points in the overlap
                 new_traj = [p[0] for p in new_path[:overlap_frames] if p[1] < overlap_frames]
                 
-                # First point in case frechet fails
+                # First point in case frechet fails (no overlap)
                 new_start = new_path[0][0]
+            
+                min_len = min(len(ex_traj), len(new_traj))
 
-                # Compute Fréchet distance
-                try:
+                # If there are indeed some points in the overlap
+                if min_len >= 2:
+
+                    # Compute Fréchet distance
                     frechet_dist = frechet_distance(LineString(ex_traj), LineString(new_traj))
 
                     # Compute average Euclidean distance
-                    min_len = min(len(ex_traj), len(new_traj))
                     avg_euc = np.mean([self.euclidean_distance(ex_traj[k], new_traj[k]) for k in range(min_len)])
 
                     # Combine into a final cost
                     total_cost = self.frechet_euclidean_weights['Frechet'] * frechet_dist + self.frechet_euclidean_weights['Euclidean'] * avg_euc  
-                    cost_matrix[i, j] = total_cost
-                except Exception as e:
-                    with open(f"{output_dir}\\paths_merging.txt", "a") as f:
-                        f.write(f"-----------Error computing Fréchet distance: {e}---------------\nUsing Euclidean distance instead.\n")
-                    cost_matrix[i, j] = self.euclidean_distance(ex_end, new_start)
-                    continue
                 
-        # Find rows and columns with at least one finite value
-        valid_rows = np.any(np.isfinite(cost_matrix), axis=1)
-        valid_cols = np.any(np.isfinite(cost_matrix), axis=0)
+                # If no overlap, compare euclidean distance
+                else:
+                    total_cost = self.euclidean_distance(ex_end, new_start)
 
-        valid_row_idx = np.where(valid_rows)[0]
-        valid_col_idx = np.where(valid_cols)[0]
+                cost_matrix[i, j] = total_cost
 
-        if len(valid_row_idx) == 0 or len(valid_col_idx) == 0:
-            raise ValueError("No valid assignments possible.")
+                
+        # Sort all path pairs by cost
+        best_paths_pairs = []
+        for i in range(num_existing):
+            for j in range(num_new):
 
-        # Extract the valid submatrix
-        reduced_cost_matrix = cost_matrix[np.ix_(valid_row_idx, valid_col_idx)]
+                #remove later 
+                # Logs
+                with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                    f.write(f"\n\Cost between existing path\n {existing_paths[i]}\n and new path \n{merged_paths[j]}\n is : {cost_matrix[i, j]}. \n\n")
+        
+                if cost_matrix[i, j] >= 0 and cost_matrix[i, j] < 5:
+                    best_paths_pairs.append((i, j, cost_matrix[i, j]))
+        
+        # Sort by frechet distance 
+        best_paths_pairs.sort(key=lambda x: x[2])
 
-        # Apply Hungarian algorithm
-        row_ind, col_ind = linear_sum_assignment(reduced_cost_matrix)
+        # Track assignments
+        assigned_ex = set()
+        assigned_new = set()
+        assigned_count = 0
 
-        # Merge paths in global_batches_tracks
-        for r, c in zip(row_ind, col_ind):
-            i = valid_row_idx[r]
-            j = valid_col_idx[c]
+        # Correct frame numbers
+        new_merged_paths = []
+        for i, path in enumerate(merged_paths):
+            new_path = []
+            for point in path:
+                corrected_frame = batch_size * batch_count + point[1]
+                new_path.append((point[0], corrected_frame))
+            new_merged_paths.append(new_path)
+        
+        # Sanity check
+        assert len(new_merged_paths) == len(merged_paths)
+
+        # Extend paths with lowest cost 
+        for ex_idx, new_idx, _ in best_paths_pairs:
+            if ex_idx not in assigned_ex and new_idx not in assigned_new:
+                
+                # Logs
+                with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                    f.write(f"\n\nMerging existing path\n {existing_paths[ex_idx]}\n and \n{new_merged_paths[new_idx]}\n Cost is : {cost_matrix[ex_idx, new_idx]}. \n\n")
+
+                # Merge and add path to global tracks
+                existing_paths[ex_idx].extend(new_merged_paths[new_idx])
+                assigned_ex.add(ex_idx)
+                assigned_new.add(new_idx)
+                assigned_count += 1
+                
+                # Only one assignment per path
+                if assigned_count == len(new_merged_paths):
+                    break
+
+        return existing_paths
+
+        # # Find rows and columns with at least one finite value
+        # valid_rows = np.any(np.isfinite(cost_matrix), axis=1)
+        # valid_cols = np.any(np.isfinite(cost_matrix), axis=0)
+
+        # valid_row_idx = np.where(valid_rows)[0]
+        # valid_col_idx = np.where(valid_cols)[0]
+
+        # if len(valid_row_idx) == 0 or len(valid_col_idx) == 0:
+        #     raise ValueError("No valid assignments possible.")
+
+        # # Extract the valid submatrix
+        # reduced_cost_matrix = cost_matrix[np.ix_(valid_row_idx, valid_col_idx)]
+
+        # # Apply Hungarian algorithm
+        # row_ind, col_ind = linear_sum_assignment(reduced_cost_matrix)
+
+        # # Merge paths in global_batches_tracks
+        # for r, c in zip(row_ind, col_ind):
+        #     i = valid_row_idx[r]
+        #     j = valid_col_idx[c]
 
             
-            cost = reduced_cost_matrix[r, c]
-            if cost > 5:
-                continue
+        #     cost = reduced_cost_matrix[r, c]
+        #     if cost > 5:
+        #         continue
 
-            # Debugging
-            with open(f"{output_dir}\\paths_merging.txt", "a") as f:
-                f.write(f"\n\nmerging existing path: \n {existing_paths[i]}\n\n and new path \n\n {merged_paths[j]}\n\n")
+        #     # Debugging
+        #     with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+        #         f.write(f"\n\nmerging existing path: \n {existing_paths[i]}\n\n and new path \n\n {merged_paths[j]}\n\n")
 
-            existing_paths[i].extend(merged_paths[j])
+        #     existing_paths[i].extend(merged_paths[j])
 
         return existing_paths
             

@@ -98,8 +98,8 @@ MAX_PIG_MVMT_BETWEEN_TWO_FRAMES = 0.1          # max distance between two points
 FRECHET_THRESHOLD = 0.3                         # TODO 
 SIMILARITY_THRESHOLD = 0.05
 FRECHET_EUCLIDEAN_WEIGHTS = {
-    'Frechet': 1,
-    'Euclidean': 0.5
+    'Frechet': 0.5,     # 1
+    'Euclidean': 1.5    # 0.5
     } 
 BATCH_SIZE = 200                                # Number of frames processed before merging views together
 
