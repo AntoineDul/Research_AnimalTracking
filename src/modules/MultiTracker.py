@@ -86,7 +86,7 @@ class MultiTracker:
         return tracks     
            
 # =============== Batch implementation ==============================
-    def batch_match(self, paths_list1, paths_list2, cam_id1, cam_id2, output_dir):  # paths_list = [ [((x1, y1), f1), ((x2, y2), f2), ...], ... ]
+    def batch_match(self, paths_list1, paths_list2, cam_id1, cam_id2, logs_path):  # paths_list = [ [((x1, y1), f1), ((x2, y2), f2), ...], ... ]
         """
         Match and merge similar paths from two different camera views.
         paths_list = [ [((x1, y1), f1), ((x2, y2), f2), ...], ... ]
@@ -126,13 +126,22 @@ class MultiTracker:
                 if len(path2) <2:
                     empty_paths2 += 1   # keep track of number of empty paths
                     continue       
+                
+                # Get the common frame window to compare paths
+                start = max(path1[0][1], path2[0][1])
+                end = min(path1[-1][1], path2[-1][1])
+                if start >= end:
+                    continue    # no overlap 
 
                 # Separate points coordinates from frame numbers to compute frechet dist
-                coords1 = [p[0] for p in path1]
-                coords2 = [p[0] for p in path2]
+                coords1 = [p[0] for p in path1 if start <= p[1] <= end]
+                coords2 = [p[0] for p in path2 if start <= p[1] <= end]
+
+                if len(coords1) < 2 or len(coords2) < 2:
+                    continue  # Not enough points to compare
 
                 # Compute Frechet distance between paths and add the min distance between endpoints
-                paths_dist = frechet_distance(LineString(coords1), LineString(coords2)) #+ min(self.euclidean_distance(coords1[-1], coords2[0]), self.euclidean_distance(coords2[-1], coords1[0]))
+                paths_dist = frechet_distance(LineString(coords1), LineString(coords2)) + min(self.euclidean_distance(coords1[0], coords2[0]), self.euclidean_distance(coords2[-1], coords1[-1]))
 
                 # Fill cost matrix
                 cost_matrix[i, j] = paths_dist
@@ -141,17 +150,17 @@ class MultiTracker:
         if np.all(np.isinf(cost_matrix)):
             if empty_paths1 == len_paths_1 and empty_paths2 == len_paths_2:
                 # Logs
-                with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                with open(logs_path, "a") as f:
                     f.write(f"\n\nNo paths in either cam {cam_id1} and {cam_id2} \n\n")
                 return paths_list1
             elif empty_paths1 == len_paths_1:
                 # Logs
-                with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                with open(logs_path, "a") as f:
                     f.write(f"\n\nNo paths in cam {cam_id1}\n\n")
                 return paths_list2
             elif empty_paths2 == len_paths_2:
                 # Logs
-                with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                with open(logs_path, "a") as f:
                     f.write(f"\n\nNo paths in cam {cam_id2} \n\n")
                 return paths_list1
             else: 
@@ -163,6 +172,11 @@ class MultiTracker:
             for j in range(len(paths_list2)):
                 if cost_matrix[i, j] >= 0 and cost_matrix[i, j] <= self.frechet_threshold:
                     best_paths_pairs.append((i, j, cost_matrix[i, j]))
+                else:
+
+                    # Logs
+                    with open(logs_path, "a") as f:
+                        f.write(f"\n\nNot adding paths\n {paths_list1[i]} and path \n{paths_list2[j]} \n to the best pairs, cost is {cost_matrix[i, j]}\n\n")
         
         # Sort by frechet distance 
         best_paths_pairs.sort(key=lambda x: x[2])
@@ -171,11 +185,12 @@ class MultiTracker:
         assigned_paths1 = set()
         assigned_paths2 = set()
 
+        # Greedy assignment of paths
         for path1_idx, path2_idx, _ in best_paths_pairs:
             if path1_idx not in assigned_paths1 and path2_idx not in assigned_paths2:
                 
                 # Logs
-                with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                with open(logs_path, "a") as f:
                     f.write(f"\n\nBest frechet dist found between path\n {paths_list1[i]}\n and \n{paths_list2[j]}\n is \n{cost_matrix[i, j]}. Merging and adding path. \n\n")
                 
                 # Merge and add path to global tracks
@@ -195,7 +210,7 @@ class MultiTracker:
                 # Add paths if it is in a zone covered only by that camera
                 if cam_id1 not in self.overlapped_cams and is_outside_overlap(path):
                     # Logs
-                    with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                    with open(logs_path, "a") as f:
                         f.write(f"\n\nPath:\n {path}\n no match found but is in non-overlapped zone, so adding it. \n\n")
                     global_paths.append(path)
 
@@ -218,7 +233,7 @@ class MultiTracker:
             if j not in assigned_paths2:
                 if cam_id2 not in self.overlapped_cams and is_outside_overlap(path):
                     # Logs
-                    with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                    with open(logs_path, "a") as f:
                         f.write(f"\n\nPath:\n {path}\n no match found but is in non-overlapped zone, so adding it. \n\n")
                     global_paths.append(path)
 
@@ -234,7 +249,7 @@ class MultiTracker:
                         self.orphan_paths.append(path)
 
         # Logs
-        with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+        with open(logs_path, "a") as f:
             f.write(f"\n\nPaths AFTER batch_match between cam {cam_id1} and {cam_id2} ({len(global_paths)} paths): \n\n")
             for i, path in enumerate(global_paths):
                 f.write(f"\npath {i}: {path}\n")
@@ -313,7 +328,7 @@ class MultiTracker:
             elif i in path2_dict:
                 final_path.append((path2_dict[i], i))
             else:
-                continue  # Frame missing in both — optionally insert None
+                continue  # Frame missing in both 
 
         return final_path
 
@@ -384,7 +399,7 @@ class MultiTracker:
         top_indices = [idx for idx, _ in scores[:total_nb_pig]]
         return [filtered[i] for i in top_indices]
 
-    def extend_global_paths(self, merged_paths, output_dir, overlap_frames, batch_size, batch_count):
+    def extend_global_paths(self, merged_paths, logs_path, overlap_frames, batch_size, batch_count):
         """Match global merged paths from new batch to current global paths"""
 
         existing_paths = self.global_batches_tracks
@@ -398,7 +413,7 @@ class MultiTracker:
                 continue
             
             # Take last 10 points or all if fewer
-            ex_traj = [p[0] for p in ex_path[-overlap_frames:] if p[1] >= batch_size - overlap_frames]
+            ex_traj = [p[0] for p in ex_path[-overlap_frames:] if p[1] >= batch_size - (2 * overlap_frames)]    # Times 2 because we already shifted frames by minus overlap frames when extending global paths
 
             # last point in case frechet fails
             ex_end = ex_path[-1][0]
@@ -441,8 +456,8 @@ class MultiTracker:
 
                 #remove later 
                 # Logs
-                with open(f"{output_dir}\\paths_merging.txt", "a") as f:
-                    f.write(f"\n\Cost between existing path\n {existing_paths[i]}\n and new path \n{merged_paths[j]}\n is : {cost_matrix[i, j]}. \n\n")
+                with open(logs_path, "a") as f:
+                    f.write(f"\n\nCost between existing path\n {existing_paths[i]}\n and new path \n{merged_paths[j]}\n is : {cost_matrix[i, j]}. \n\n")
         
                 if cost_matrix[i, j] >= 0 and cost_matrix[i, j] < 5:
                     best_paths_pairs.append((i, j, cost_matrix[i, j]))
@@ -460,8 +475,10 @@ class MultiTracker:
         for i, path in enumerate(merged_paths):
             new_path = []
             for point in path:
-                corrected_frame = batch_size * batch_count + point[1]
-                new_path.append((point[0], corrected_frame))
+                frame_nb = point[1]
+                if frame_nb >= overlap_frames:
+                    corrected_frame = batch_size * batch_count + point[1] - overlap_frames
+                    new_path.append((point[0], corrected_frame))
             new_merged_paths.append(new_path)
         
         # Sanity check
@@ -472,7 +489,7 @@ class MultiTracker:
             if ex_idx not in assigned_ex and new_idx not in assigned_new:
                 
                 # Logs
-                with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+                with open(logs_path, "a") as f:
                     f.write(f"\n\nMerging existing path\n {existing_paths[ex_idx]}\n and \n{new_merged_paths[new_idx]}\n Cost is : {cost_matrix[ex_idx, new_idx]}. \n\n")
 
                 # Merge and add path to global tracks
@@ -486,47 +503,13 @@ class MultiTracker:
                     break
 
         return existing_paths
-
-        # # Find rows and columns with at least one finite value
-        # valid_rows = np.any(np.isfinite(cost_matrix), axis=1)
-        # valid_cols = np.any(np.isfinite(cost_matrix), axis=0)
-
-        # valid_row_idx = np.where(valid_rows)[0]
-        # valid_col_idx = np.where(valid_cols)[0]
-
-        # if len(valid_row_idx) == 0 or len(valid_col_idx) == 0:
-        #     raise ValueError("No valid assignments possible.")
-
-        # # Extract the valid submatrix
-        # reduced_cost_matrix = cost_matrix[np.ix_(valid_row_idx, valid_col_idx)]
-
-        # # Apply Hungarian algorithm
-        # row_ind, col_ind = linear_sum_assignment(reduced_cost_matrix)
-
-        # # Merge paths in global_batches_tracks
-        # for r, c in zip(row_ind, col_ind):
-        #     i = valid_row_idx[r]
-        #     j = valid_col_idx[c]
-
             
-        #     cost = reduced_cost_matrix[r, c]
-        #     if cost > 5:
-        #         continue
-
-        #     # Debugging
-        #     with open(f"{output_dir}\\paths_merging.txt", "a") as f:
-        #         f.write(f"\n\nmerging existing path: \n {existing_paths[i]}\n\n and new path \n\n {merged_paths[j]}\n\n")
-
-        #     existing_paths[i].extend(merged_paths[j])
-
-        return existing_paths
-            
-    def handle_outliers(self, max_mvmt_between_frames, paths_by_cam:dict, output_dir):
+    def handle_outliers(self, max_mvmt_between_frames, paths_by_cam:dict, logs_path):
         """Go through all paths and reassign points that were wrongly ided to the right path"""
         
         # Logs
-        if output_dir is not None:
-            with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+        if logs_path is not None:
+            with open(logs_path, "a") as f:
                 f.write("-------------- handle outliers analysis -----------------")
                 f.write(f"\npaths before handling outliers:\n")
                 for cam_id, paths_list in paths_by_cam.items():
@@ -542,7 +525,6 @@ class MultiTracker:
             # Extract outliers from each path without mutating during iteration
             for path in paths_list:
                 
-
                 removed_in_a_row = 0
                 frames_present = set()
                 to_remove = []
@@ -593,24 +575,18 @@ class MultiTracker:
                         outliers_placed.append(outlier)
                         break  # only assign to one path
 
-            # idx_pig = None
             # Check if point is in pen boundaries, if not shift it into them
             for idx, path in enumerate(paths_list):
                 if len(path) == 0:
                     continue
 
-                # corner_pig = all(pt[0][0] >= 2.1 and pt[0][1] >= 2 for pt in path)
                 for i, point in enumerate(path):
                     point = self.check_point_in_boundaries(point)
                     path[i] = point
-            #     if corner_pig:
-            #         idx_pig = idx
-            # if idx_pig is not None:
-            #     paths_by_cam[cam_id] = [paths_list[i] for i in range(len(paths_list)) if i != idx_pig]
                         
         # Logs 
-        if output_dir is not None:
-            with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+        if logs_path is not None:
+            with open(logs_path, "a") as f:
                 f.write(f"\n\n\npaths AFTER handling outliers:\n")
                 for cam_id, paths_list in paths_by_cam.items():
                     f.write(f"=== cam {cam_id} ===")
@@ -620,11 +596,11 @@ class MultiTracker:
                 
         return paths_by_cam
 
-    def merge_incomplete_paths(self, paths_list, batch_size, max_mvmt_pig, output_dir):
+    def merge_incomplete_paths(self, paths_list, batch_size, max_mvmt_pig, logs_path):
         """Merge short paths that are close in time and space."""
                 
         # Logs
-        with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+        with open(logs_path, "a") as f:
             f.write(f"\n\nPaths before merge_incomplete_paths ({len(paths_list)} paths): \n\n")
             for i, path in enumerate(paths_list):
                 f.write(f"\npath {i}: {path}\n")
@@ -683,7 +659,7 @@ class MultiTracker:
                 final_merged_paths.append(path)
                 
         # Logs
-        with open(f"{output_dir}\\paths_merging.txt", "a") as f:
+        with open(logs_path, "a") as f:
             f.write(f"\n\nPaths AFTER merge_incomplete_paths ({len(final_merged_paths)} paths): \n\n")
             for i, path in enumerate(final_merged_paths):
                 f.write(f"\npath {i}: {path}\n")

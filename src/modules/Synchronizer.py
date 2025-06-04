@@ -14,9 +14,9 @@ class Synchronizer:
         self.END = 1
         self.cam_id_to_change = cam_id_to_change
 
-    def get_relevant_rfid(self, start_time, end_time):
-        # Filter RFID data based on the time range
-        pass
+    # def get_relevant_rfid(self, start_time, end_time):
+    #     # Filter RFID data based on the time range
+    #     pass
 
     def synchronize(self):
         video_caps = {}
@@ -59,15 +59,17 @@ class Synchronizer:
     
     def separate_by_cameras(self, video_files):
         """Separate videos by camera ID"""
+
         videos = {}
+        
         file_info = [(self.parse_filename(f), f) for f in video_files]
         for ((cam_id, start_time, end_time), file) in file_info:
             if cam_id not in videos:
                 videos[cam_id] = []
             videos[cam_id].append(((start_time, end_time), file))
-
+        
         self.sorted_video_times = {k: sorted(v, key=lambda x: x[0][self.START]) for k, v in videos.items()}
-
+        
         # Check there is no time gap between two recording from same pov
         for cam_id, all_video_data in self.sorted_video_times.items():
             for i in range(len(all_video_data)):
@@ -76,8 +78,7 @@ class Synchronizer:
                     assert all_video_data[i - 1][0][self.END] == all_video_data[i][0][self.START]
                 except AssertionError:
                     raise ValueError(f"Videos must not have time gaps in order to be processed ({cam_id}).")
-                
-        return self.sorted_video_times  # {cam_id: [((start, end), filename), ...]}
+        return self.sorted_video_times.copy()  # {cam_id: [((start, end), filename), ...]}
 
     def get_offsets(self):
         """Get offsets for each camera w.r.t. to the first camera that started"""

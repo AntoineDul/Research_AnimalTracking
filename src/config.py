@@ -1,5 +1,8 @@
 import os
 import numpy as np
+from datetime import datetime
+
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 # Directories
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -14,9 +17,11 @@ BATCH_PLOTS_PATH = os.path.join(OUTPUT_DIR, "batch_plots")
 PROCESSED_VIDEO_PATH = os.path.join(OUTPUT_DIR, "processed_videos\\tracked_pigs.avi")
 YOLO_MODEL_PATH = os.path.join(MODEL_DIR, "yolov11_pig_v2.pt")
 RFID_PATH = os.path.join(DATA_DIR, "RFID", "21-056 Drinker Raw Data 26Jun2024-18Sep2024.xlsx")
+LOGS_PATH = os.path.join(OUTPUT_DIR, f"logs\\{timestamp}_logs.txt")
+CSV_PATH = os.path.join(DATA_DIR, "RFID", "manually_tracked_pigs.csv")
 
 # Farm settings
-NUM_PIGS = 14                                   # Total number of pigs in the pen
+NUM_PIGS = 15                                   # Total number of pigs in the pen
 NUM_CAMERAS = 5                                 # Number of cameras in the pen 
 FIRST_CAMERA = 5                                # First camera ID in the pen (pen 2)
 CAM_ID_TO_CHANGE = {17: 9}                      # Dictionary with format {original_cam_id: new_cam_id} -> need the cam id to be sequential (e.g. 5, 6, 7, 8, 9)
@@ -95,7 +100,7 @@ ALPHA = 0.5                                     # Weight for IoU in cost functio
 MAX_PIG_MVMT_BETWEEN_TWO_FRAMES = 0.1          # max distance between two points in a batch to be considered from same paths and not outliers
 
 # Batch analysis parameters
-FRECHET_THRESHOLD = 0.3                         # TODO 
+FRECHET_THRESHOLD = 1                         # TODO 
 SIMILARITY_THRESHOLD = 0.05
 FRECHET_EUCLIDEAN_WEIGHTS = {
     'Frechet': 0.5,     # 1
