@@ -1,4 +1,3 @@
-from scipy.optimize import linear_sum_assignment
 import numpy as np
 import math
 from shapely import LineString, frechet_distance
@@ -36,8 +35,6 @@ class MultiTracker:
 
     def save_tracking_history(self, file_path):
         """Save the tracking history to a JSON file."""
-
-        # print(f"Tracking history : {self.global_batches_tracks}")
 
         clean_history = self.convert_to_builtin_type(self.global_batches_tracks)
         with open(file_path, 'w') as f:

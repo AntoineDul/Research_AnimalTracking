@@ -9,16 +9,14 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 MODEL_DIR = os.path.join(BASE_DIR, "models")
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
-MEDIAFLUX_VIDEO_DIR = "C:\\Users\\antoi\\Documents\\Unimelb_Mediaflux\\2024-10-16~08"
+MEDIAFLUX_VIDEO_DIR = "C:\\Users\\antoi\\Documents\\Unimelb_Mediaflux\\2024-10-16~08"   # Directory containing all videos to process
 
-# Paths
-TRACKING_HISTORY_PATH = os.path.join(OUTPUT_DIR, "track_history")
-BATCH_PLOTS_PATH = os.path.join(OUTPUT_DIR, "batch_plots")
-PROCESSED_VIDEO_PATH = os.path.join(OUTPUT_DIR, "processed_videos\\tracked_pigs.avi")
-YOLO_MODEL_PATH = os.path.join(MODEL_DIR, "yolov11_pig_v2.pt")
-RFID_PATH = os.path.join(DATA_DIR, "RFID", "21-056 Drinker Raw Data 26Jun2024-18Sep2024.xlsx")
-LOGS_PATH = os.path.join(OUTPUT_DIR, f"logs\\{timestamp}_logs.txt")
-CSV_PATH = os.path.join(DATA_DIR, "RFID", "manually_tracked_pigs.csv")
+# Paths : files need to be created beforehand
+TRACKING_HISTORY_PATH = os.path.join(OUTPUT_DIR, "track_history")                       # Path to file where a json file with all tracks will be written every batch.
+BATCH_PLOTS_PATH = os.path.join(OUTPUT_DIR, "batch_plots")                              # Path to file where all plots will be stored.
+YOLO_MODEL_PATH = os.path.join(MODEL_DIR, "yolov11_pig_v2.pt")                          # Path to fine-tuned yolo model weights.
+LOGS_PATH = os.path.join(OUTPUT_DIR, f"logs\\{timestamp}_logs.txt")                     # logs file needs to be created.
+CSV_PATH = os.path.join(DATA_DIR, "RFID", "manually_tracked_pigs.csv")                  # Path to ground truth positions at given timestamps
 
 # Farm settings
 NUM_PIGS = 15                                   # Total number of pigs in the pen
@@ -28,55 +26,15 @@ CAM_ID_TO_CHANGE = {17: 9}                      # Dictionary with format {origin
 RESOLUTION = (2592, 1944)                       # Camera resolution from official datasheet
 DISTORTION = [-0.5, 0.1, 0, 0]                  # Distortion parameters used to undistort fisheye (found thorugh trial and error)
 CAM_FULLY_OVERLAPPED = [5, 6, 7]                # List of cameras whose views are fully included in another camera view (no possibility of detecting a pig ONLY from these cams)
-NON_OVERLAP_ZONES = [-1, 1]                   # Define the zones that can only be seen by one camera
-CAM_BIAS = {                                    # For testing purposes
-    5: [
-        {"det_center": (377, 497), "true_footprint": (463, 523)},
-        {"det_center": (943, 244), "true_footprint": (977, 307)},
-        {"det_center": (1397, 984), "true_footprint": (1445, 1029)},
-        {"det_center": (988, 1398), "true_footprint": (999, 1368)},
-    ],
-    6: [
-        {"det_center": (1526, 1234), "true_footprint": (1382, 1216)},
-        {"det_center": (1868, 1710), "true_footprint": (1735, 1689)},
-        {"det_center": (2516, 1415), "true_footprint": (2303, 1432)},
-        {"det_center": (1609, 386), "true_footprint": (1514, 416)},
-        {"det_center": (1405, 1696), "true_footprint": (1357, 1578)},
-    ],
-    7: [
-        {"det_center": (1654, 1736), "true_footprint": (1626, 1686)},
-        {"det_center": (1943, 1017), "true_footprint": (1920, 1000)},
-        {"det_center": (1993, 311), "true_footprint": (1943, 395)},
-        {"det_center": (609, 885), "true_footprint": (630, 870)},
-        {"det_center": (521, 1812), "true_footprint": (564, 1736)},
-        {"det_center": (2041, 1690), "true_footprint": (1962, 1618)},
-    ],
-    8: [
-        {"det_center": (2024, 1358), "true_footprint": (2025, 1359)},
-        {"det_center": (634, 1025), "true_footprint": (712, 1100)},
-        {"det_center": (1260, 683), "true_footprint": (1322, 748)},
-        {"det_center": (911, 226), "true_footprint": (967, 353)},
-        {"det_center": (608, 252), "true_footprint": (686, 383)},
-        {"det_center": (536, 1476), "true_footprint": (630, 1492)},
-    ],
-    9: [
-        {"det_center": (2144, 1010), "true_footprint": (2144, 1012)},
-        {"det_center": (2133, 1512), "true_footprint": (2133, 1512)},
-        {"det_center": (2189, 434), "true_footprint": (2189, 438)},
-        {"det_center": (1058, 903), "true_footprint": (1144, 944)},
-        {"det_center": (460, 1408), "true_footprint": (557, 1423)},
-        {"det_center": (1323, 483), "true_footprint": (1401, 576)},
-        {"det_center": (802, 1475), "true_footprint": (922, 1514)},
-    ]
-}
-CAM_POSITIONS ={
+NON_OVERLAP_ZONES = [-1, 1]                     # Define the zones that can only be seen by one camera (e.g. [-1, 1] means that for all y coordinates below -1 or above 1, are points only seen in one pov)
+CAM_POSITIONS = {                               # Approximated camera positions from video views -> to improve with more accurate measurements
     5: (-0.1, 0.5),
     6: (-0.1, -0.6),
     7: (1, 0),
     8: (0, -2.8),
     9: (2.2, 2.5)
     }
-THALES_SCALE = {                                # Scale to undo bias of each cam (apply Thales theorem)
+THALES_SCALE = {                                # Scale to undo bias of each cam (apply Thales theorem), these were approximated -> improve by replacing them by calculated constants from cam heights
     5: (0.94, 0.94),                
     6: (0.83, 0.95),
     7: (0.98, 0.93),
@@ -84,7 +42,7 @@ THALES_SCALE = {                                # Scale to undo bias of each cam
     9: (0.99, 0.93)
     }
 
-# Select detection model and tracking method. NOTE: other methods could be implemented.
+# Select detection model and tracking method. NOTE: other methods could be implemented by following the base tracker or base detector abstract classes models
 DETECTION_METHOD = "YOLO"                       # Options: "YOLO"
 TRACKING_METHOD = "GREEDY"                      # Options: "GREEDY"
 
@@ -97,19 +55,18 @@ MAX_TRACK_AGE = 30                              # Max frames a lost object remai
 IOU_THRESHOLD = 0.6                             # Intersection over Union threshold for tracking
 MAX_DISTANCE = 50                               # Maximum distance for matching detections to existing tracks   
 ALPHA = 0.5                                     # Weight for IoU in cost function, weight of distance is (1 - alpha)
-MAX_PIG_MVMT_BETWEEN_TWO_FRAMES = 0.1          # max distance between two points in a batch to be considered from same paths and not outliers
+MAX_PIG_MVMT_BETWEEN_TWO_FRAMES = 0.1           # max distance between two points in a batch to be considered from same paths and not outliers
 
 # Batch analysis parameters
-FRECHET_THRESHOLD = 1                         # TODO 
-SIMILARITY_THRESHOLD = 0.05
-FRECHET_EUCLIDEAN_WEIGHTS = {
+FRECHET_THRESHOLD = 1                           # Max frechet distance between 2 paths to be considered for merging
+SIMILARITY_THRESHOLD = 0.05                     # Minimum distance for 2 paths to be considered distincts.
+FRECHET_EUCLIDEAN_WEIGHTS = {                   # Weights for weighted sum for cost matrix when merging paths
     'Frechet': 0.5,     # 1
     'Euclidean': 1.5    # 0.5
     } 
 BATCH_SIZE = 200                                # Number of frames processed before merging views together
 
 # Video processing settings
-# FRAME_SKIP = 2                                  # Number of frames to skip for processing
 REWIND_FRAMES = 20                              # Number of frames to rewind to overlap batches
 
 # Output settings
@@ -117,7 +74,8 @@ OUTPUT_VIDEO_WIDTH = 1600                       # Width of output video
 OUTPUT_VIDEO_HEIGHT = 900                       # Height of output video
 OUTPUT_VIDEO_FPS = 50                           # Frames per second for output video
 
-# Mapping settings for computing homography matrices
+# Mapping settings for computing homography matrices 
+# NOTE: this was tailored to batch 2 pen 2, would want a calibration sequence to replace this manually sampled data
 MAPPINGS = {
     '5' : {
     'image_points': np.array(

@@ -1,13 +1,12 @@
 import csv
 import json
 import math
-import numpy as np
-from src import config
+import config
 from collections import defaultdict
 import re
 import matplotlib.pyplot as plt
 
-DISTANCE_THRESHOLD = 0.3
+DISTANCE_THRESHOLD = 0.2
 
 def load_ground_truth(csv_path):
     gt_data = {}
@@ -72,23 +71,25 @@ def plot_tracked_pigs_over_time(timestamp_counts, output_file='tracked_pigs_over
     
     counts = [timestamp_counts[ts] for ts in timestamps]
     timestamps = [timestamp / 1200 for timestamp in timestamps]
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(12, 12))
     plt.plot(timestamps, counts, marker='o', color='darkgreen')
-    plt.title('Total Number of Tracked Pigs per Minute')
-    plt.xlabel('Time (minutes)')
-    plt.ylabel('Number of Tracked Pigs')
+    plt.title('Total Number of Tracked Pigs per Minute', fontsize=28)
+    plt.xlabel('Time (minutes)', fontsize=24)
+    plt.ylabel('Number of Tracked Pigs', fontsize=24)
+    plt.tick_params(axis='both', which='major', labelsize=20)
     plt.grid(True, linestyle='--', alpha=0.6)
+    plt.ylim(0, 14)  # Set y-axis from 0 to 14
     plt.tight_layout()
     plt.savefig(output_file)
     plt.show()
 
     print(f"Saved pig count over time plot as {output_file}")
 
-def evaluate():
-    gt = load_ground_truth(config.CSV_PATH)
+def evaluate(tracked_json, ground_truth_csv):
+    gt = load_ground_truth(ground_truth_csv)
     check_frames = gt.keys()
     print("gt: ",gt)
-    tracked = load_tracked(f"{config.TRACKING_HISTORY_PATH}\\20250604_144202_track_200_batch-size_100_batches.json", check_frames)
+    tracked = load_tracked(tracked_json, check_frames)
     print("tracked: ", tracked)
 
     # 1. Initial matching at first timestamp
@@ -149,10 +150,9 @@ def evaluate():
     
     # 5. Plot number of tracked pigs per timestamp (per minute)
     timestamp_counts = count_tracked_pigs_per_timestamp(tracked, gt.keys())
-    print(f"timestamps:\n\n{timestamp_counts}")
-    timestamp_counts = {0: 14, 1200: 13, 7200: 11, 8400: 9, 2400: 12, 3600: 10, 6000: 10, 9600: 9, 10800: 9, 12000: 6, 4800: 10}
     plot_tracked_pigs_over_time(timestamp_counts)
 
-# Example usage
+
 if __name__ == "__main__":
-    evaluate()
+    # Input the path to the json file containing the tracking history and the path to the csv file containing the ground truth
+    evaluate(tracked_json=f"{config.TRACKING_HISTORY_PATH}\\20250604_144202_track_200_batch-size_100_batches.json", ground_truth_csv=config.CSV_PATH)

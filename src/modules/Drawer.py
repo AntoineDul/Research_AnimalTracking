@@ -7,7 +7,10 @@ class Drawer:
     def plot_batch_paths(data, cam_id, batch_size, output_path, batch_count):
         """Plot the paths of the batch just processed of the camera with cam_id input"""
         plt.figure(figsize=(8, 6))
-        plt.title(f'Cam {cam_id} view - Paths - {batch_size}')
+        if cam_id == 'overall':
+            plt.title('Overall Merged Paths', fontsize=18)
+        else: 
+            plt.title(f'Camera {cam_id} Detections - Batch Size {batch_size}', fontsize=18)
         cmap = cm.get_cmap('tab20', len(data))  # Use a colormap with enough colors
 
         for i, path in enumerate(data):
@@ -21,13 +24,12 @@ class Drawer:
 
         plt.xlim(0, 2.5)    # set x-axis limits
         plt.ylim(-3, 3)     # set y-axis limits
-        plt.xlabel('X coordinate')
-        plt.ylabel('Y coordinate')
+        plt.xlabel('X coordinate', fontsize=14)
+        plt.ylabel('Y coordinate', fontsize=14)
         # plt.legend()
         plt.grid(True)
         plt.savefig(f"{output_path}\\batch_{batch_count}_batch-size_{batch_size}_cam_{cam_id}_batch_plot.jpg")
         print(f"Batch plot for camera {cam_id} saved.")
-        # plt.show()
 
     @staticmethod
     def display_plot_batch(data, cam_id, batch_size):
@@ -47,8 +49,8 @@ class Drawer:
 
         plt.xlim(0, 2.5)    # set x-axis limits
         plt.ylim(-3, 3)     # set y-axis limits
-        plt.xlabel('X coordinate')
-        plt.ylabel('Y coordinate')
+        plt.xlabel('X coordinate', fontsize=14)
+        plt.ylabel('Y coordinate', fontsize=14)
         plt.legend()
         plt.grid(True)
         plt.show()

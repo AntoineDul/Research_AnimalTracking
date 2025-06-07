@@ -1,6 +1,5 @@
 import src.modules as modules
 import src.config as config
-import numpy as np
 import cv2
 import os
 from datetime import datetime
@@ -24,27 +23,9 @@ class PigMonitor:
         self.drawer = modules.Drawer()
         self.file_directory = config.MEDIAFLUX_VIDEO_DIR
         self.sync = modules.Synchronizer(cam_id_to_change=config.CAM_ID_TO_CHANGE, file_directory=self.file_directory)
-        self.video_writer_path = config.PROCESSED_VIDEO_PATH
         self.tracking_history_path = config.TRACKING_HISTORY_PATH
         self.frame_number = 0
         self.max_frames = 1000
-
-
-    # def process_frame(self, frame, frame_count, cam_id=None):
-    #     # Undistort frame
-    #     undistorted_frame = self.mapper.undistort_images(frame)
-
-    #     # Detect pigs in the frame
-    #     detections = self.detector.detect(undistorted_frame)
-
-    #     # Update tracks 
-    #     tracks = self.multi_tracker.track(detections, cam_id)
-
-    #     # Draw tracks on the frame
-    #     display_frame = self.drawer.draw_bboxes(undistorted_frame.copy(), tracks)
-    #     display_frame = self.drawer.add_useful_info(display_frame, frame_count, tracks)
-
-    #     return display_frame, tracks
     
     def process_batch_frame(self, frame, cam_id):
         # Undistort frame
@@ -57,90 +38,6 @@ class PigMonitor:
         tracks = self.multi_tracker.track(detections, cam_id)
 
         return tracks
-
-    # def monitor(self, video_path):
-    #     """Processes a single video file."""
-
-    #     # Check if video path exists
-    #     if os.path.exists(video_path):
-    #         cap = cv2.VideoCapture(video_path)
-    #     else:
-    #         print(f"Error: Video file {video_path} not found.")
-    #         return
-        
-    #     # Check if video capture opened successfully
-    #     if not cap.isOpened():
-    #         print("Error: Could not open video source.")
-    #         return
-        
-    #     # Define output video writer
-    #     fourcc = cv2.VideoWriter_fourcc(*'XVID')
-        
-    #     # Get video properties
-    #     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    #     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    #     fps = cap.get(cv2.CAP_PROP_FPS)
-    #     if fps <= 0:
-    #         fps = 30  # Default to 30 fps if not available
-        
-    #     out = cv2.VideoWriter(self.video_writer_path, fourcc, fps, (width, height))
-        
-    #     print("Press 'q' to quit.")
-    #     print("Press 's' to save a screenshot.")
-    #     print("Press '+' to increase detection threshold.")
-    #     print("Press '-' to decrease detection threshold.")
-
-    #     frame_count = 0
-    #     screenshot_count = 0
-        
-    #     while cap.isOpened():
-    #         ret, frame = cap.read()
-
-    #         if not ret:
-    #             break
-            
-    #         frame_count += 1
-            
-    #         # Skip frames to improve performance (process every 2nd frame)
-    #         if frame_count % config.FRAME_SKIP != 0 and frame_count > 1:
-    #             continue
-                
-    #         # Process frame
-    #         processed_frame, tracks = self.process_frame(frame, frame_count)
-            
-    #         # Write to output video
-    #         out.write(processed_frame)
-                
-    #         # Resize frame for display
-    #         display_frame = cv2.resize(processed_frame, (1600, 900))     
-                
-    #         # Display frame
-    #         cv2.imshow("Pig Tracking", display_frame)
-            
-    #         # Handle key presses
-    #         key = cv2.waitKey(1) & 0xFF
-    #         if key == ord('q'):
-    #             break
-    #         elif key == ord('s'):
-    #             # Save a screenshot
-    #             screenshot_path = f"outputs/screenshot_{screenshot_count}.jpg"
-    #             cv2.imwrite(screenshot_path, processed_frame)
-    #             print(f"Saved screenshot to {screenshot_path}")
-    #             screenshot_count += 1
-    #         elif key == ord('+'):
-    #             # Increase threshold
-    #             self.detector.increase_threshold()
-    #             print(f"Detection threshold increased to {self.detector.get_confidence_threshold():.2f}")
-    #         elif key == ord('-'):
-    #             # Decrease threshold
-    #             self.detector.decrease_threshold()
-    #             print(f"Detection threshold increased to {self.detector.get_confidence_threshold():.2f}")
-        
-    #     cap.release()
-    #     out.release()
-    #     cv2.destroyAllWindows()
-        
-    #     print(f"Tracking complete. Output saved to {self.video_writer_path}")
 
     def set_up_monitoring(self):
         """Processes all video files in the directory specified in config."""
@@ -181,61 +78,10 @@ class PigMonitor:
         width = config.OUTPUT_VIDEO_WIDTH
         height = config.OUTPUT_VIDEO_HEIGHT
         fps = config.OUTPUT_VIDEO_FPS
-        out = cv2.VideoWriter(self.video_writer_path, fourcc, fps, (width, height))
 
         assert video_caps is not None
-        assert out is not None
 
-        return video_caps, out
-
-    # def multi_monitor(self):
-
-    #     video_caps, out = self.set_up_monitoring()
-
-    #     frame_count = 0
-
-    #     # Frame sync + display loop
-    #     while True:
-    #         frames = {}
-    #         all_successful = True
-
-    #         frame_count += 1
-    #         # Skip frames to improve performance (process every 2nd frame)
-    #         if frame_count % config.FRAME_SKIP != 0 and frame_count > 1:
-    #             continue
-
-    #         for cam_id, cap in video_caps.items():
-    #             success, frame = cap.read()
-
-    #             if not success:
-    #                 print(f"Camera {cam_id} has no more frames.")       # TODO : implement queue logic to handle next video
-    #                 all_successful = False
-    #                 break
-
-    #             # Process frame
-    #             processed_frame, _ = self.process_frame(frame, frame_count, cam_id)
-
-    #             frames[cam_id] = processed_frame
-
-    #         if not all_successful:
-    #             break
-
-    #         self.multi_tracker.globally_match_tracks()  # Match tracks across cameras
-
-    #         grid = self.drawer.make_grid(frames)
-    #         out.write(grid)
-    #         cv2.imshow('Synchronized 2x2 Grid', grid)
-
-    #         if cv2.waitKey(1) & 0xFF == ord('q'):
-    #             break
-        
-    #     self.multi_tracker.save_tracking_history(self.tracking_history_path)
-    #     self.drawer.plot_logs(self.tracking_history_path, self.output_plot_path)
-
-    #     # Cleanup
-    #     for cap in video_caps.values():
-    #         cap.release()
-    #     cv2.destroyAllWindows()
+        return video_caps 
 
     def batch_monitor(self):
         """Main monitoring function, sets up and run monitoring. Saves all paths to a json file when finished running."""
@@ -246,7 +92,7 @@ class PigMonitor:
 
         self.multi_tracker.global_batches_tracks = [[] for _ in range(config.NUM_PIGS)]
 
-        video_caps, out = self.set_up_monitoring()
+        video_caps = self.set_up_monitoring()
 
         batch_count = 0
         monitor = True
@@ -378,5 +224,7 @@ class PigMonitor:
             cap.release()
         cv2.destroyAllWindows()
 
-
-
+# Run the pipeline
+if __name__ == "__main__":
+    monitor = PigMonitor()
+    monitor.batch_monitor()

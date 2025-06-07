@@ -10,7 +10,7 @@ class Mapper:
                 [0, self.w, self.h / 2],
                 [0, 0, 1]
             ], dtype=np.float64)
-        self.d = np.array(distortion, dtype=np.float64) # [k1, k2, p1, p2] where k1, k2 -> radial distortion and p1, p2 -> tangential distortion
+        self.d = np.array(distortion, dtype=np.float64)        # [k1, k2, p1, p2] where k1, k2 -> radial distortion and p1, p2 -> tangential distortion
         self.cameras = list(int(cam_id) for cam_id in mappings.keys())
         self.homography_matrices = [
             cv2.findHomography(mapping['image_points'], mapping['world_points'])[0] for mapping in mappings.values()
@@ -60,7 +60,6 @@ class Mapper:
         # Convert relative position to meters
         rel_x = (input_position[0] - cam_pos[0])
         rel_y = (input_position[1] - cam_pos[1])
-        # print(f"point relative to position camera: ({rel_x}, {rel_y})")
 
         # Apply Thales scaling 
         cam_scale_x, cam_scale_y = scales[cam_id]
